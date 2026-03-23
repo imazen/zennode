@@ -53,6 +53,20 @@ pub enum NodeRole {
     /// Orientation composes via D4 algebra. Last crop/constraint wins.
     Geometry,
 
+    /// Orientation sub-role of geometry (EXIF orient, flip, rotate).
+    ///
+    /// Treated identically to [`Geometry`](Self::Geometry) by the bridge.
+    /// Exists so downstream crates can tag orientation-only nodes distinctly
+    /// from resize/crop nodes.
+    Orient,
+
+    /// Resize sub-role of geometry (constrain, scale, expand canvas).
+    ///
+    /// Treated identically to [`Geometry`](Self::Geometry) by the bridge.
+    /// Exists so downstream crates can tag resize/layout nodes distinctly
+    /// from orientation-only nodes.
+    Resize,
+
     /// Per-pixel filter operations: exposure, contrast, color, sharpen, etc.
     ///
     /// Adjacent filter nodes feed into `zenfilters::Pipeline`.
@@ -73,6 +87,13 @@ pub enum NodeRole {
 
     /// Encoding configuration: format selection, quality, codec params.
     Encode,
+}
+
+impl NodeRole {
+    /// Whether this role represents a geometry operation (including orient/resize sub-roles).
+    pub fn is_geometry(self) -> bool {
+        matches!(self, Self::Geometry | Self::Orient | Self::Resize)
+    }
 }
 
 /// How a node can be fused/coalesced with adjacent operations.

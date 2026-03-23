@@ -48,6 +48,15 @@ pub struct NodeSchema {
     pub compat_version: u32,
 }
 
+impl NodeSchema {
+    /// Backwards-compatible accessor for [`role`](Self::role).
+    ///
+    /// [`Phase`](crate::Phase) is a type alias for [`NodeRole`].
+    pub fn phase(&self) -> NodeRole {
+        self.role
+    }
+}
+
 /// A single parameter descriptor.
 pub struct ParamDesc {
     /// Machine name — matches the Rust struct field name.
