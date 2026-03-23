@@ -23,7 +23,7 @@ fn derive_node_enum_inner(input: &DeriveInput) -> syn::Result<TokenStream2> {
             return Err(syn::Error::new_spanned(
                 enum_name,
                 "NodeEnum can only be derived on enums",
-            ))
+            ));
         }
     };
 
@@ -66,7 +66,8 @@ fn derive_node_enum_inner(input: &DeriveInput) -> syn::Result<TokenStream2> {
             }
         }
 
-        let label = custom_label.unwrap_or_else(|| attrs::ident_to_label(&variant_ident.to_string()));
+        let label =
+            custom_label.unwrap_or_else(|| attrs::ident_to_label(&variant_ident.to_string()));
 
         variant_descriptors.push(quote! {
             ::zenode::EnumVariant {

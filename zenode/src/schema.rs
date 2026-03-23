@@ -92,25 +92,13 @@ pub enum ParamKind {
         step: f32,
     },
     /// Signed integer parameter.
-    Int {
-        min: i32,
-        max: i32,
-        default: i32,
-    },
+    Int { min: i32, max: i32, default: i32 },
     /// Unsigned integer parameter.
-    U32 {
-        min: u32,
-        max: u32,
-        default: u32,
-    },
+    U32 { min: u32, max: u32, default: u32 },
     /// Boolean toggle.
-    Bool {
-        default: bool,
-    },
+    Bool { default: bool },
     /// Free-form string.
-    Str {
-        default: &'static str,
-    },
+    Str { default: &'static str },
     /// Enumeration of named variants.
     Enum {
         variants: &'static [EnumVariant],
@@ -126,9 +114,7 @@ pub enum ParamKind {
         labels: &'static [&'static str],
     },
     /// RGBA color.
-    Color {
-        default: [f32; 4],
-    },
+    Color { default: [f32; 4] },
 }
 
 /// An enum variant descriptor.

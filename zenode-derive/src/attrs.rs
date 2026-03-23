@@ -1,7 +1,7 @@
 //! Attribute parsing for `#[node(...)]`, `#[param(...)]`, and `#[kv(...)]`.
 
-use syn::{Expr, Ident, Lit, LitInt, LitStr, Meta, Token};
 use syn::parse::ParseStream;
+use syn::{Expr, Ident, Lit, LitInt, LitStr, Meta, Token};
 
 /// Parsed struct-level `#[node(...)]` attributes.
 #[derive(Default)]

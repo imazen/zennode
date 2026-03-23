@@ -71,11 +71,7 @@ impl NodeRegistry {
     }
 
     /// Create a node instance by ID and parameter map.
-    pub fn create(
-        &self,
-        id: &str,
-        params: &ParamMap,
-    ) -> Result<Box<dyn NodeInstance>, NodeError> {
+    pub fn create(&self, id: &str, params: &ParamMap) -> Result<Box<dyn NodeInstance>, NodeError> {
         let def = self
             .get(id)
             .ok_or_else(|| NodeError::UnknownNode(id.to_string()))?;

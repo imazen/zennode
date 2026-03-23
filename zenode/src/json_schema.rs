@@ -6,7 +6,7 @@
 
 extern crate std;
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use crate::registry::NodeRegistry;
 use crate::schema::{NodeSchema, ParamDesc, ParamKind};
@@ -38,12 +38,10 @@ pub fn node_to_json_schema(schema: &NodeSchema) -> Value {
     }
 
     if let Some(ref coalesce) = schema.coalesce {
-        node_schema["x-zenode-coalesce"] =
-            serde_json::to_value(coalesce).unwrap_or(Value::Null);
+        node_schema["x-zenode-coalesce"] = serde_json::to_value(coalesce).unwrap_or(Value::Null);
     }
 
-    node_schema["x-zenode-format"] =
-        serde_json::to_value(schema.format).unwrap_or(Value::Null);
+    node_schema["x-zenode-format"] = serde_json::to_value(schema.format).unwrap_or(Value::Null);
 
     if !required.is_empty() {
         node_schema["required"] = json!(required);
@@ -175,8 +173,7 @@ fn param_to_schema(param: &ParamDesc) -> Value {
     if !param.section.is_empty() {
         schema["x-zenode-section"] = json!(param.section);
     }
-    schema["x-zenode-slider"] =
-        serde_json::to_value(param.slider).unwrap_or(Value::Null);
+    schema["x-zenode-slider"] = serde_json::to_value(param.slider).unwrap_or(Value::Null);
     if !param.kv_keys.is_empty() {
         schema["x-zenode-kv-keys"] = json!(param.kv_keys);
     }

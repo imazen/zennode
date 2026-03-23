@@ -124,8 +124,11 @@ impl KvPairs {
         match val_str.parse::<f32>() {
             Ok(v) => Some(v),
             Err(_) => {
-                self.warn(key, KvWarningKind::InvalidValue,
-                    alloc::format!("cannot parse '{val_str}' as number for key '{key}'"));
+                self.warn(
+                    key,
+                    KvWarningKind::InvalidValue,
+                    alloc::format!("cannot parse '{val_str}' as number for key '{key}'"),
+                );
                 None
             }
         }
@@ -137,8 +140,11 @@ impl KvPairs {
         match val_str.parse::<i32>() {
             Ok(v) => Some(v),
             Err(_) => {
-                self.warn(key, KvWarningKind::InvalidValue,
-                    alloc::format!("cannot parse '{val_str}' as integer for key '{key}'"));
+                self.warn(
+                    key,
+                    KvWarningKind::InvalidValue,
+                    alloc::format!("cannot parse '{val_str}' as integer for key '{key}'"),
+                );
                 None
             }
         }
@@ -150,8 +156,11 @@ impl KvPairs {
         match val_str.parse::<u32>() {
             Ok(v) => Some(v),
             Err(_) => {
-                self.warn(key, KvWarningKind::InvalidValue,
-                    alloc::format!("cannot parse '{val_str}' as unsigned integer for key '{key}'"));
+                self.warn(
+                    key,
+                    KvWarningKind::InvalidValue,
+                    alloc::format!("cannot parse '{val_str}' as unsigned integer for key '{key}'"),
+                );
                 None
             }
         }
@@ -166,8 +175,11 @@ impl KvPairs {
             "true" | "1" | "yes" => Some(true),
             "false" | "0" | "no" => Some(false),
             _ => {
-                self.warn(key, KvWarningKind::InvalidValue,
-                    alloc::format!("cannot parse '{val_str}' as boolean for key '{key}'"));
+                self.warn(
+                    key,
+                    KvWarningKind::InvalidValue,
+                    alloc::format!("cannot parse '{val_str}' as boolean for key '{key}'"),
+                );
                 None
             }
         }
@@ -266,7 +278,11 @@ mod tests {
     fn duplicate_keys_last_wins() {
         let mut kv = KvPairs::from_querystring("w=100&w=200");
         assert_eq!(kv.take_u32("w", "test"), Some(200));
-        assert!(kv.warnings().iter().any(|w| w.kind == KvWarningKind::DuplicateKey));
+        assert!(
+            kv.warnings()
+                .iter()
+                .any(|w| w.kind == KvWarningKind::DuplicateKey)
+        );
     }
 
     #[test]

@@ -10,10 +10,7 @@ pub enum NodeError {
     /// Unknown node ID.
     UnknownNode(String),
     /// Unknown parameter name.
-    UnknownParam {
-        node: &'static str,
-        param: String,
-    },
+    UnknownParam { node: &'static str, param: String },
     /// Parameter value type mismatch.
     TypeMismatch {
         node: &'static str,
@@ -52,7 +49,10 @@ impl fmt::Display for NodeError {
                 node,
                 param,
                 expected,
-            } => write!(f, "type mismatch for '{param}' on '{node}': expected {expected}"),
+            } => write!(
+                f,
+                "type mismatch for '{param}' on '{node}': expected {expected}"
+            ),
             Self::OutOfRange {
                 node,
                 param,

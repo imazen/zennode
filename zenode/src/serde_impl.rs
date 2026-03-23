@@ -5,12 +5,10 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::param::ParamValue;
-use crate::schema::{
-    EnumVariant, NodeGroup, NodeSchema, ParamDesc, ParamKind, SliderMapping,
-};
-use crate::ordering::{CoalesceInfo, Phase};
 use crate::format::{AlphaHandling, FormatHint, PixelFormatPreference};
+use crate::ordering::{CoalesceInfo, Phase};
+use crate::param::ParamValue;
+use crate::schema::{EnumVariant, NodeGroup, NodeSchema, ParamDesc, ParamKind, SliderMapping};
 
 // --- ParamValue: untagged serialization ---
 
@@ -179,7 +177,13 @@ impl Serialize for ParamKind {
         use serde::ser::SerializeMap;
         let mut map = serializer.serialize_map(None)?;
         match self {
-            Self::Float { min, max, default, identity, step } => {
+            Self::Float {
+                min,
+                max,
+                default,
+                identity,
+                step,
+            } => {
                 map.serialize_entry("type", "float")?;
                 map.serialize_entry("min", min)?;
                 map.serialize_entry("max", max)?;
@@ -213,7 +217,13 @@ impl Serialize for ParamKind {
                 let names: alloc::vec::Vec<&str> = variants.iter().map(|v| v.name).collect();
                 map.serialize_entry("variants", &names)?;
             }
-            Self::FloatArray { len, min, max, default, labels } => {
+            Self::FloatArray {
+                len,
+                min,
+                max,
+                default,
+                labels,
+            } => {
                 map.serialize_entry("type", "float_array")?;
                 map.serialize_entry("len", len)?;
                 map.serialize_entry("min", min)?;

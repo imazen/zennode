@@ -61,10 +61,6 @@ fn enum_zenode_name() {
 #[test]
 fn enum_doc_comments() {
     let variants = EdgeMode::zenode_variants();
-    assert!(variants[0]
-        .description
-        .contains("Sobel operator"));
-    assert!(variants[2]
-        .description
-        .contains("Canny edge detector"));
+    assert!(variants[0].description.contains("Sobel operator"));
+    assert!(variants[2].description.contains("Canny edge detector"));
 }
