@@ -28,10 +28,12 @@ fn derive_node_inner(input: &DeriveInput) -> syn::Result<TokenStream2> {
         .group
         .as_ref()
         .ok_or_else(|| syn::Error::new(Span::call_site(), "missing #[node(group = ...)]"))?;
-    let role = node_attrs
-        .role
-        .as_ref()
-        .ok_or_else(|| syn::Error::new(Span::call_site(), "missing #[node(role = ...)] (or legacy #[node(phase = ...)])"))?;
+    let role = node_attrs.role.as_ref().ok_or_else(|| {
+        syn::Error::new(
+            Span::call_site(),
+            "missing #[node(role = ...)] (or legacy #[node(phase = ...)])",
+        )
+    })?;
 
     let struct_name = &input.ident;
     let struct_doc = attrs::extract_doc_comment(&input.attrs);
