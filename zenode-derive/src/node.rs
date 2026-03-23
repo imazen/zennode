@@ -48,9 +48,19 @@ fn derive_node_inner(input: &DeriveInput) -> syn::Result<TokenStream2> {
     let fields = match &input.data {
         Data::Struct(data) => match &data.fields {
             Fields::Named(fields) => &fields.named,
-            _ => return Err(syn::Error::new(Span::call_site(), "Node requires named fields")),
+            _ => {
+                return Err(syn::Error::new(
+                    Span::call_site(),
+                    "Node requires named fields",
+                ));
+            }
         },
-        _ => return Err(syn::Error::new(Span::call_site(), "Node can only be derived on structs")),
+        _ => {
+            return Err(syn::Error::new(
+                Span::call_site(),
+                "Node can only be derived on structs",
+            ));
+        }
     };
 
     // Parse field attributes and generate param descriptors
@@ -122,13 +132,28 @@ fn derive_node_inner(input: &DeriveInput) -> syn::Result<TokenStream2> {
         });
 
         // to_params
-        to_params_tokens.push(gen_to_params(field_name, &field_name_str, field_type, value_variant));
+        to_params_tokens.push(gen_to_params(
+            field_name,
+            &field_name_str,
+            field_type,
+            value_variant,
+        ));
 
         // get_param
-        get_param_arms.push(gen_get_param(field_name, &field_name_str, field_type, value_variant));
+        get_param_arms.push(gen_get_param(
+            field_name,
+            &field_name_str,
+            field_type,
+            value_variant,
+        ));
 
         // set_param
-        set_param_arms.push(gen_set_param(field_name, &field_name_str, field_type, value_variant));
+        set_param_arms.push(gen_set_param(
+            field_name,
+            &field_name_str,
+            field_type,
+            value_variant,
+        ));
 
         // Default initializer
         default_init_tokens.push(quote! { #field_name: #default_expr });
@@ -172,8 +197,14 @@ fn derive_node_inner(input: &DeriveInput) -> syn::Result<TokenStream2> {
     let num_params = param_desc_tokens.len();
 
     // Generated names
-    let schema_name = format_ident!("__ZENODE_{}_SCHEMA", to_screaming_snake(&struct_name.to_string()));
-    let params_name = format_ident!("__ZENODE_{}_PARAMS", to_screaming_snake(&struct_name.to_string()));
+    let schema_name = format_ident!(
+        "__ZENODE_{}_SCHEMA",
+        to_screaming_snake(&struct_name.to_string())
+    );
+    let params_name = format_ident!(
+        "__ZENODE_{}_PARAMS",
+        to_screaming_snake(&struct_name.to_string())
+    );
     let def_struct = format_ident!("{}NodeDef", struct_name);
     let def_static = format_ident!("{}_NODE", to_screaming_snake(&struct_name.to_string()));
 
@@ -285,21 +316,89 @@ fn derive_node_inner(input: &DeriveInput) -> syn::Result<TokenStream2> {
     })
 }
 
+/// Try to parse a type string as `[f32;N]` and return `N` if it matches.
+fn parse_f32_array(type_str: &str) -> Option<usize> {
+    let s = type_str.strip_prefix('[')?.strip_suffix(']')?;
+    let (elem, len_str) = s.split_once(';')?;
+    if elem.trim() != "f32" {
+        return None;
+    }
+    len_str.trim().parse::<usize>().ok()
+}
+
 /// Determine ParamKind tokens, ParamValue variant, default expr, identity expr for a field.
 fn field_param_kind(
     ty: &syn::Type,
     attrs: &ParamAttrs,
     _field_name: &str,
-) -> syn::Result<(TokenStream2, &'static str, TokenStream2, Option<TokenStream2>)> {
+) -> syn::Result<(
+    TokenStream2,
+    &'static str,
+    TokenStream2,
+    Option<TokenStream2>,
+)> {
     let type_str = quote!(#ty).to_string().replace(' ', "");
+
+    // Check for [f32; N] array type before the scalar match
+    if let Some(len) = parse_f32_array(&type_str) {
+        let min = attrs
+            .range_min
+            .as_ref()
+            .map(|e| quote!(#e))
+            .unwrap_or(quote!(f32::MIN));
+        let max = attrs
+            .range_max
+            .as_ref()
+            .map(|e| quote!(#e))
+            .unwrap_or(quote!(f32::MAX));
+        let default = attrs
+            .default
+            .as_ref()
+            .map(|e| quote!(#e))
+            .unwrap_or(quote!(0.0));
+        let labels: Vec<_> = attrs.labels.iter().collect();
+        let labels_tokens = if labels.is_empty() {
+            quote! { &[] }
+        } else {
+            quote! { &[#(#labels),*] }
+        };
+        let kind = quote! {
+            ::zenode::ParamKind::FloatArray {
+                len: #len, min: #min, max: #max, default: #default, labels: #labels_tokens,
+            }
+        };
+        let default_expr = quote! { [#default; #len] };
+        let id_expr = attrs.identity.as_ref().map(|e| quote!(#e));
+        return Ok((kind, "F32Array", default_expr, id_expr));
+    }
 
     match type_str.as_str() {
         "f32" => {
-            let min = attrs.range_min.as_ref().map(|e| quote!(#e)).unwrap_or(quote!(f32::MIN));
-            let max = attrs.range_max.as_ref().map(|e| quote!(#e)).unwrap_or(quote!(f32::MAX));
-            let default = attrs.default.as_ref().map(|e| quote!(#e)).unwrap_or(quote!(0.0));
-            let identity = attrs.identity.as_ref().map(|e| quote!(#e)).unwrap_or(quote!(0.0));
-            let step = attrs.step.as_ref().map(|e| quote!(#e)).unwrap_or(quote!(0.1));
+            let min = attrs
+                .range_min
+                .as_ref()
+                .map(|e| quote!(#e))
+                .unwrap_or(quote!(f32::MIN));
+            let max = attrs
+                .range_max
+                .as_ref()
+                .map(|e| quote!(#e))
+                .unwrap_or(quote!(f32::MAX));
+            let default = attrs
+                .default
+                .as_ref()
+                .map(|e| quote!(#e))
+                .unwrap_or(quote!(0.0));
+            let identity = attrs
+                .identity
+                .as_ref()
+                .map(|e| quote!(#e))
+                .unwrap_or(quote!(0.0));
+            let step = attrs
+                .step
+                .as_ref()
+                .map(|e| quote!(#e))
+                .unwrap_or(quote!(0.1));
             let kind = quote! {
                 ::zenode::ParamKind::Float {
                     min: #min, max: #max, default: #default, identity: #identity, step: #step,
@@ -309,41 +408,81 @@ fn field_param_kind(
             Ok((kind, "F32", default, id_expr))
         }
         "i32" => {
-            let min = attrs.range_min.as_ref().map(|e| quote!(#e)).unwrap_or(quote!(i32::MIN));
-            let max = attrs.range_max.as_ref().map(|e| quote!(#e)).unwrap_or(quote!(i32::MAX));
-            let default = attrs.default.as_ref().map(|e| quote!(#e)).unwrap_or(quote!(0));
+            let min = attrs
+                .range_min
+                .as_ref()
+                .map(|e| quote!(#e))
+                .unwrap_or(quote!(i32::MIN));
+            let max = attrs
+                .range_max
+                .as_ref()
+                .map(|e| quote!(#e))
+                .unwrap_or(quote!(i32::MAX));
+            let default = attrs
+                .default
+                .as_ref()
+                .map(|e| quote!(#e))
+                .unwrap_or(quote!(0));
             let kind = quote! {
                 ::zenode::ParamKind::Int { min: #min, max: #max, default: #default }
             };
             Ok((kind, "I32", default, None))
         }
         "u32" => {
-            let min = attrs.range_min.as_ref().map(|e| quote!(#e)).unwrap_or(quote!(0));
-            let max = attrs.range_max.as_ref().map(|e| quote!(#e)).unwrap_or(quote!(u32::MAX));
-            let default = attrs.default.as_ref().map(|e| quote!(#e)).unwrap_or(quote!(0));
+            let min = attrs
+                .range_min
+                .as_ref()
+                .map(|e| quote!(#e))
+                .unwrap_or(quote!(0));
+            let max = attrs
+                .range_max
+                .as_ref()
+                .map(|e| quote!(#e))
+                .unwrap_or(quote!(u32::MAX));
+            let default = attrs
+                .default
+                .as_ref()
+                .map(|e| quote!(#e))
+                .unwrap_or(quote!(0));
             let kind = quote! {
                 ::zenode::ParamKind::U32 { min: #min, max: #max, default: #default }
             };
             Ok((kind, "U32", default, None))
         }
         "bool" => {
-            let default = attrs.default.as_ref().map(|e| quote!(#e)).unwrap_or(quote!(false));
+            let default = attrs
+                .default
+                .as_ref()
+                .map(|e| quote!(#e))
+                .unwrap_or(quote!(false));
             let kind = quote! { ::zenode::ParamKind::Bool { default: #default } };
             Ok((kind, "Bool", default, None))
         }
         "String" => {
-            let default_lit = attrs.default.as_ref().map(|e| quote!(#e)).unwrap_or(quote!(""));
+            let default_lit = attrs
+                .default
+                .as_ref()
+                .map(|e| quote!(#e))
+                .unwrap_or(quote!(""));
             let kind = quote! { ::zenode::ParamKind::Str { default: #default_lit } };
-            let default_expr = attrs.default.as_ref()
+            let default_expr = attrs
+                .default
+                .as_ref()
                 .map(|e| quote!(::zenode::__private::String::from(#e)))
                 .unwrap_or_else(|| quote!(::zenode::__private::String::new()));
             Ok((kind, "Str", default_expr, None))
         }
         _ => {
             // Unknown type: treat as string
-            let default_lit = attrs.default.as_ref().map(|e| quote!(#e)).unwrap_or(quote!(""));
+            let default_lit = attrs
+                .default
+                .as_ref()
+                .map(|e| quote!(#e))
+                .unwrap_or(quote!(""));
             let kind = quote! { ::zenode::ParamKind::Str { default: #default_lit } };
-            let default_expr = attrs.default.as_ref()
+            let default_expr = attrs
+                .default
+                .as_ref()
                 .map(|e| quote!(::zenode::__private::String::from(#e)))
                 .unwrap_or_else(|| quote!(::zenode::__private::String::new()));
             Ok((kind, "Str", default_expr, None))
@@ -358,6 +497,14 @@ fn gen_to_params(
     _variant: &str,
 ) -> TokenStream2 {
     let type_str = quote!(#field_type).to_string().replace(' ', "");
+    if parse_f32_array(&type_str).is_some() {
+        return quote! {
+            __map.insert(
+                ::zenode::__private::String::from(#field_name_str),
+                ::zenode::ParamValue::F32Array(::zenode::__private::Vec::from(self.#field_name.as_slice())),
+            );
+        };
+    }
     match type_str.as_str() {
         "f32" => quote! {
             __map.insert(::zenode::__private::String::from(#field_name_str), ::zenode::ParamValue::F32(self.#field_name));
@@ -384,12 +531,21 @@ fn gen_get_param(
     _variant: &str,
 ) -> TokenStream2 {
     let type_str = quote!(#field_type).to_string().replace(' ', "");
+    if parse_f32_array(&type_str).is_some() {
+        return quote! {
+            #field_name_str => ::core::option::Option::Some(
+                ::zenode::ParamValue::F32Array(::zenode::__private::Vec::from(self.#field_name.as_slice()))
+            ),
+        };
+    }
     let value_expr = match type_str.as_str() {
         "f32" => quote! { ::zenode::ParamValue::F32(self.#field_name) },
         "i32" => quote! { ::zenode::ParamValue::I32(self.#field_name) },
         "u32" => quote! { ::zenode::ParamValue::U32(self.#field_name) },
         "bool" => quote! { ::zenode::ParamValue::Bool(self.#field_name) },
-        _ => quote! { ::zenode::ParamValue::Str(::zenode::__private::ToString::to_string(&self.#field_name)) },
+        _ => {
+            quote! { ::zenode::ParamValue::Str(::zenode::__private::ToString::to_string(&self.#field_name)) }
+        }
     };
     quote! {
         #field_name_str => ::core::option::Option::Some(#value_expr),
@@ -403,6 +559,19 @@ fn gen_set_param(
     _variant: &str,
 ) -> TokenStream2 {
     let type_str = quote!(#field_type).to_string().replace(' ', "");
+    if let Some(len) = parse_f32_array(&type_str) {
+        return quote! {
+            #field_name_str => {
+                match value.as_f32_array() {
+                    ::core::option::Option::Some(arr) if arr.len() == #len => {
+                        self.#field_name.copy_from_slice(arr);
+                        true
+                    }
+                    _ => false,
+                }
+            }
+        };
+    }
     let extract = match type_str.as_str() {
         "f32" => quote! { value.as_f32() },
         "i32" => quote! { value.as_i32() },
@@ -428,6 +597,12 @@ fn gen_from_kv(
     node_id: &syn::LitStr,
 ) -> TokenStream2 {
     let type_str = quote!(#field_type).to_string().replace(' ', "");
+
+    // Arrays don't come from querystrings — skip
+    if parse_f32_array(&type_str).is_some() {
+        return quote! {};
+    }
+
     let take_method = match type_str.as_str() {
         "f32" => quote! { take_f32 },
         "i32" => quote! { take_i32 },
@@ -466,6 +641,9 @@ fn gen_identity_check(
     identity_expr: &TokenStream2,
 ) -> TokenStream2 {
     let type_str = quote!(#field_type).to_string().replace(' ', "");
+    if parse_f32_array(&type_str).is_some() {
+        return quote! { self.#field_name.iter().all(|v| (v - #identity_expr).abs() < 1e-6) };
+    }
     match type_str.as_str() {
         "f32" => quote! { (self.#field_name - #identity_expr).abs() < 1e-6 },
         _ => quote! { self.#field_name == #identity_expr },
