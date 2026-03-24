@@ -49,13 +49,15 @@ pub trait NodeInstance: Send + Sync + Any {
 | `label` | `&'static str` | Human-readable name for UI. |
 | `description` | `&'static str` | One-line tooltip. From doc comments. |
 | `group` | `NodeGroup` | UI category. |
-| `phase` | `Phase` | Pipeline ordering. |
+| `role` | `NodeRole` | Pipeline role (what planner this feeds into). |
 | `params` | `&'static [ParamDesc]` | Parameters in display order. |
 | `tags` | `&'static [&'static str]` | Discovery tags. |
 | `coalesce` | `Option<CoalesceInfo>` | Fusion/grouping info. |
 | `format` | `FormatHint` | Pixel format preferences. |
 | `version` | `u32` | Schema version (additive). |
 | `compat_version` | `u32` | Oldest deserializable version. |
+
+Backwards-compat accessor: `schema.phase()` returns `self.role`.
 
 ### `ParamDesc`
 
@@ -95,7 +97,10 @@ Accessor methods: `as_f32()`, `as_i32()`, `as_u32()`, `as_bool()`, `as_str()`, `
 
 **`NodeGroup`**: Decode, Encode, Tone, ToneRange, ToneMap, Color, Detail, Effects, Geometry, Layout, Canvas, Composite, Quantize, Analysis, Hdr, Raw, Auto, Other.
 
-**`Phase`** (ordered): Decode, RawDevelop, Orient, SceneLinear, ToneMap, DisplayAdjust, PreResize, Resize, PostResize, Quantize, Encode.
+**`NodeRole`**: Decode, Geometry, Orient, Resize, Filter, Composite, Analysis, Quantize, Encode.
+
+- `NodeRole::is_geometry()` returns true for `Geometry`, `Orient`, `Resize`.
+- `Orient` and `Resize` are sub-roles of `Geometry` — the bridge treats them identically but downstream crates can tag their nodes specifically.
 
 **`SliderMapping`**: Linear, SquareFromSlider, FactorCentered, Logarithmic, NotSlider.
 
@@ -111,7 +116,30 @@ Accessor methods: `as_f32()`, `as_i32()`, `as_u32()`, `as_bool()`, `as_str()`, `
 
 `group: &'static str`, `fusable: bool`, `is_target: bool`.
 
-Pipeline compilers recognize adjacent nodes in the same coalesce group and fuse them. Example: layout operations (`crop` + `resize` + `pad`) fuse into a single streaming operation.
+Adjacent nodes in the same coalesce group are fused into a single operation. The fused result is always mathematically equivalent to sequential execution. The bridge never reorders — it only fuses adjacent compatible nodes.
+
+## Ordering Model
+
+**zenode does NOT reorder user-specified node sequences.** Nodes execute in the order the user declared them (RIAPI querystring position, JSON array index, or DAG edges).
+
+`NodeRole` is a **type tag** that tells the pipeline bridge what kind of planner a node feeds into. The bridge walks the user's node list left-to-right, accumulating runs of compatible nodes. When the role changes, it flushes the accumulated run to its planner and starts a new run.
+
+```text
+User order: [orient, crop, resize, exposure, contrast, sharpen, encode]
+
+Bridge walks left-to-right:
+  orient   → geometry run (start)
+  crop     → geometry run (extend)
+  resize   → geometry run (extend)
+  exposure → FLUSH geometry → LayoutPlan. Filter run (start).
+  contrast → filter run (extend — same coalesce group)
+  sharpen  → filter run (extend — neighborhood, handled by Pipeline)
+  encode   → FLUSH filter → FilterPipeline. Collect encode config.
+
+Result: Source → LayoutPlan → FilterPipeline → Encode
+```
+
+If the user writes `[resize, sharpen, crop]`, they get `Source → LayoutPlan(resize) → FilterPipeline(sharpen) → Crop`. Different graph, different results, both correct.
 
 ## RIAPI Key-Value System
 
@@ -157,7 +185,7 @@ UnrecognizedKey, InvalidValue, DeprecatedKey, DuplicateKey.
 ```
 #[node(id = "crate.name")]      Permanent FQN
 #[node(group = Tone)]           NodeGroup variant
-#[node(phase = DisplayAdjust)]  Phase variant
+#[node(role = Filter)]          NodeRole variant
 ```
 
 **Optional:**
@@ -174,6 +202,8 @@ UnrecognizedKey, InvalidValue, DeprecatedKey, DuplicateKey.
 #[node(tags("basic", "tone"))]
 ```
 
+Legacy: `#[node(phase = Filter)]` is accepted as an alias for `role`.
+
 ### `#[derive(Node)]` — Field Attributes
 
 **`#[param(...)]`:**
@@ -187,7 +217,7 @@ section = "Main"               UI sub-section
 slider = SquareFromSlider      Slider mapping
 label = "..."                  Human label (default: field name titlecased)
 since = 2                      Version that added this param
-labels("R", "O", "Y")         Per-element labels for arrays
+labels("R", "O", "Y")         Per-element labels for [f32; N] arrays
 visible_when = "mode=advanced" Conditional visibility
 color                          Mark [f32; 4] as Color kind
 ```
@@ -227,6 +257,28 @@ For struct `Foo`:
 | `[f32; N]` | `FloatArray` | `range`, `default`, `labels` |
 | `[f32; 4]` + `color` | `Color` | `default` |
 
+## Built-in Nodes
+
+### `zenode.decode` (in zenode)
+
+Format-independent decode configuration:
+- `io_id` (i32) — I/O slot identifier
+- `hdr_mode` (String) — "sdr_only" (default), "hdr_reconstruct", "preserve"
+- `color_intent` (String) — "preserve" (default), "srgb"
+- `min_size` (u32) — JPEG prescale hint (0 = none)
+
+### `zencodecs.quality_intent` (in zencodecs, feature `zenode`)
+
+Format selection and quality profile. QualityIntent moved from zenode to zencodecs because it's about codec selection (zencodecs' domain). Maps to imageflow's `EncoderPreset::Auto`.
+
+- `profile` (String) — "lowest"→"lossless" or 0-100. KV: `qp`
+- `format` (String) — "" (auto), "jpeg", "webp", etc. KV: `format`
+- `dpr` (f32) — device pixel ratio. KV: `qp.dpr`, `dpr`
+- `lossless` (String) — ""/"true"/"false"/"keep". KV: `lossless`
+- `allow_webp/avif/jxl/color_profiles` (bool) — format allowlist. KV: `accept.*`
+
+Has `to_codec_intent()` → `CodecIntent` for resolution via zencodecs' selection engine.
+
 ## Versioning Rules (NEVER BREAK)
 
 1. Node IDs are permanent. Never rename or remove.
@@ -256,3 +308,46 @@ For struct `Foo`:
 ## Error Types
 
 `NodeError`: UnknownNode, UnknownParam, TypeMismatch, OutOfRange, MissingParam, InvalidEnumVariant, Other. Implements `Display`. Implements `std::error::Error` with `std` feature.
+
+## Architecture: Where Nodes Live
+
+zenode itself only defines infrastructure + the `Decode` node. All other nodes live in their respective crates:
+
+| Crate | Nodes | Feature |
+|-------|-------|---------|
+| zenode | `Decode` | always |
+| zencodecs | `QualityIntentNode` | `zenode` |
+| zenjpeg | `EncodeJpeg` | `zenode` |
+| zenpng | `EncodePng` | `zenode` |
+| zenwebp | `EncodeWebpLossy`, `EncodeWebpLossless` | `zenode` |
+| zengif | `EncodeGif` | `zenode` |
+| zenavif | `EncodeAvif` | `zenode` |
+| zenjxl | `EncodeJxl` | `zenode` |
+| zentiff | `EncodeTiff` | `zenode` |
+| zenbitmaps | `EncodeBmp` | `zenode` |
+| zenresize | `Constrain` | `zenode` |
+| zenlayout | `Crop`, `Orient`, `FlipH/V`, `Rotate*`, `ExpandCanvas`, `Constrain` | `zenode` |
+| zenfilters | 35 filter nodes | `zenode` |
+| zenblend | `Composite` + `BlendModeEnum` | `zenode` |
+| zenquant | `Quantize` | `zenode` |
+
+## Pipeline Integration (zenpipe)
+
+### Bridge: `compile_nodes()`
+
+Converts `Vec<Box<dyn NodeInstance>>` → `PipelineGraph` + `DecodeConfig` + `EncodeConfig`.
+
+- Walks user node list left-to-right (no reordering)
+- Adjacent geometry nodes → fused `LayoutPlan` via `zenlayout::Pipeline`
+- Adjacent filter nodes → fused `zenfilters::Pipeline`
+- Encode/decode nodes separated into config structs
+- `NodeConverter` trait for extensible node→NodeOp mapping
+
+### Sidecar Streams
+
+Gain maps and depth maps track through geometry ops as parallel mini-pipelines:
+
+- `SidecarPlan::derive()` — uses `zenlayout::IdealLayout::derive_secondary()`
+- `SidecarPlan::compile()` — builds mini `PipelineGraph` with proportional transforms
+- `ProcessedSidecar` — materialized sidecar pixels + metadata for re-embedding
+- Identity detection: no transforms needed → passthrough (zero cost)
