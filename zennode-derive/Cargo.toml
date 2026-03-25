@@ -1,10 +1,10 @@
 [package]
-name = "zenode-derive"
+name = "zennode-derive"
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.85"
 license = "Apache-2.0 OR MIT"
-description = "Derive macros for zenode node definitions"
+description = "Derive macros for zennode node definitions"
 
 [lib]
 proc-macro = true

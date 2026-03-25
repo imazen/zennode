@@ -103,8 +103,8 @@ fn derive_node_inner(input: &DeriveInput) -> syn::Result<TokenStream2> {
             .unwrap_or_default();
 
         let slider_tokens = match &param_attrs.slider {
-            Some(s) => quote! { ::zenode::SliderMapping::#s },
-            None => quote! { ::zenode::SliderMapping::Linear },
+            Some(s) => quote! { ::zennode::SliderMapping::#s },
+            None => quote! { ::zennode::SliderMapping::Linear },
         };
 
         let kv_keys: Vec<_> = param_attrs.kv_keys.iter().collect();
@@ -119,7 +119,7 @@ fn derive_node_inner(input: &DeriveInput) -> syn::Result<TokenStream2> {
             field_param_kind(field_type, &param_attrs, &field_name_str)?;
 
         param_desc_tokens.push(quote! {
-            ::zenode::ParamDesc {
+            ::zennode::ParamDesc {
                 name: #field_name_str,
                 label: #param_label,
                 description: #field_doc,
@@ -223,23 +223,23 @@ fn derive_node_inner(input: &DeriveInput) -> syn::Result<TokenStream2> {
             let mut __node = #struct_name { #(#default_init_tokens),* };
             let mut __matched = false;
             #(#from_kv_tokens)*
-            if __matched { Ok(Some(::zenode::__private::Box::new(__node))) } else { Ok(None) }
+            if __matched { Ok(Some(::zennode::__private::Box::new(__node))) } else { Ok(None) }
         }
     };
 
     Ok(quote! {
         // Static param descriptors
-        static #params_name: [::zenode::ParamDesc; #num_params] = [
+        static #params_name: [::zennode::ParamDesc; #num_params] = [
             #(#param_desc_tokens),*
         ];
 
         // Static schema
-        static #schema_name: ::zenode::NodeSchema = ::zenode::NodeSchema {
+        static #schema_name: ::zennode::NodeSchema = ::zennode::NodeSchema {
             id: #id,
             label: #label,
             description: #struct_doc,
-            group: ::zenode::NodeGroup::#group,
-            role: ::zenode::NodeRole::#role,
+            group: ::zennode::NodeGroup::#group,
+            role: ::zennode::NodeRole::#role,
             params: &#params_name,
             tags: #tags_tokens,
             coalesce: #coalesce_tokens,
@@ -254,45 +254,45 @@ fn derive_node_inner(input: &DeriveInput) -> syn::Result<TokenStream2> {
         /// Static node definition singleton.
         pub static #def_static: #def_struct = #def_struct;
 
-        impl ::zenode::NodeDef for #def_struct {
-            fn schema(&self) -> &'static ::zenode::NodeSchema {
+        impl ::zennode::NodeDef for #def_struct {
+            fn schema(&self) -> &'static ::zennode::NodeSchema {
                 &#schema_name
             }
 
-            fn create(&self, params: &::zenode::ParamMap) -> ::core::result::Result<::zenode::__private::Box<dyn ::zenode::NodeInstance>, ::zenode::NodeError> {
+            fn create(&self, params: &::zennode::ParamMap) -> ::core::result::Result<::zennode::__private::Box<dyn ::zennode::NodeInstance>, ::zennode::NodeError> {
                 let mut __node = #struct_name { #(#default_init_tokens),* };
                 for (__name, __value) in params {
-                    if !<#struct_name as ::zenode::NodeInstance>::set_param(&mut __node, __name, __value.clone()) {
+                    if !<#struct_name as ::zennode::NodeInstance>::set_param(&mut __node, __name, __value.clone()) {
                         // Ignore unknown params for forward compatibility
                     }
                 }
-                Ok(::zenode::__private::Box::new(__node))
+                Ok(::zennode::__private::Box::new(__node))
             }
 
-            fn from_kv(&self, kv: &mut ::zenode::KvPairs) -> ::core::result::Result<::core::option::Option<::zenode::__private::Box<dyn ::zenode::NodeInstance>>, ::zenode::NodeError> {
+            fn from_kv(&self, kv: &mut ::zennode::KvPairs) -> ::core::result::Result<::core::option::Option<::zennode::__private::Box<dyn ::zennode::NodeInstance>>, ::zennode::NodeError> {
                 #from_kv_body
             }
         }
 
-        impl ::zenode::NodeInstance for #struct_name {
-            fn schema(&self) -> &'static ::zenode::NodeSchema {
+        impl ::zennode::NodeInstance for #struct_name {
+            fn schema(&self) -> &'static ::zennode::NodeSchema {
                 &#schema_name
             }
 
-            fn to_params(&self) -> ::zenode::ParamMap {
-                let mut __map = ::zenode::ParamMap::new();
+            fn to_params(&self) -> ::zennode::ParamMap {
+                let mut __map = ::zennode::ParamMap::new();
                 #(#to_params_tokens)*
                 __map
             }
 
-            fn get_param(&self, name: &str) -> ::core::option::Option<::zenode::ParamValue> {
+            fn get_param(&self, name: &str) -> ::core::option::Option<::zennode::ParamValue> {
                 match name {
                     #(#get_param_arms)*
                     _ => None,
                 }
             }
 
-            fn set_param(&mut self, name: &str, value: ::zenode::ParamValue) -> bool {
+            fn set_param(&mut self, name: &str, value: ::zennode::ParamValue) -> bool {
                 match name {
                     #(#set_param_arms)*
                     _ => false,
@@ -307,8 +307,8 @@ fn derive_node_inner(input: &DeriveInput) -> syn::Result<TokenStream2> {
                 self
             }
 
-            fn clone_boxed(&self) -> ::zenode::__private::Box<dyn ::zenode::NodeInstance> {
-                ::zenode::__private::Box::new(self.clone())
+            fn clone_boxed(&self) -> ::zennode::__private::Box<dyn ::zennode::NodeInstance> {
+                ::zennode::__private::Box::new(self.clone())
             }
 
             fn is_identity(&self) -> bool {
@@ -365,7 +365,7 @@ fn field_param_kind(
             quote! { &[#(#labels),*] }
         };
         let kind = quote! {
-            ::zenode::ParamKind::FloatArray {
+            ::zennode::ParamKind::FloatArray {
                 len: #len, min: #min, max: #max, default: #default, labels: #labels_tokens,
             }
         };
@@ -402,7 +402,7 @@ fn field_param_kind(
                 .map(|e| quote!(#e))
                 .unwrap_or(quote!(0.1));
             let kind = quote! {
-                ::zenode::ParamKind::Float {
+                ::zennode::ParamKind::Float {
                     min: #min, max: #max, default: #default, identity: #identity, step: #step,
                 }
             };
@@ -426,7 +426,7 @@ fn field_param_kind(
                 .map(|e| quote!(#e))
                 .unwrap_or(quote!(0));
             let kind = quote! {
-                ::zenode::ParamKind::Int { min: #min, max: #max, default: #default }
+                ::zennode::ParamKind::Int { min: #min, max: #max, default: #default }
             };
             Ok((kind, "I32", default, None))
         }
@@ -447,7 +447,7 @@ fn field_param_kind(
                 .map(|e| quote!(#e))
                 .unwrap_or(quote!(0));
             let kind = quote! {
-                ::zenode::ParamKind::U32 { min: #min, max: #max, default: #default }
+                ::zennode::ParamKind::U32 { min: #min, max: #max, default: #default }
             };
             Ok((kind, "U32", default, None))
         }
@@ -457,7 +457,7 @@ fn field_param_kind(
                 .as_ref()
                 .map(|e| quote!(#e))
                 .unwrap_or(quote!(false));
-            let kind = quote! { ::zenode::ParamKind::Bool { default: #default } };
+            let kind = quote! { ::zennode::ParamKind::Bool { default: #default } };
             Ok((kind, "Bool", default, None))
         }
         "String" => {
@@ -466,12 +466,12 @@ fn field_param_kind(
                 .as_ref()
                 .map(|e| quote!(#e))
                 .unwrap_or(quote!(""));
-            let kind = quote! { ::zenode::ParamKind::Str { default: #default_lit } };
+            let kind = quote! { ::zennode::ParamKind::Str { default: #default_lit } };
             let default_expr = attrs
                 .default
                 .as_ref()
-                .map(|e| quote!(::zenode::__private::String::from(#e)))
-                .unwrap_or_else(|| quote!(::zenode::__private::String::new()));
+                .map(|e| quote!(::zennode::__private::String::from(#e)))
+                .unwrap_or_else(|| quote!(::zennode::__private::String::new()));
             Ok((kind, "Str", default_expr, None))
         }
         _ => {
@@ -481,12 +481,12 @@ fn field_param_kind(
                 .as_ref()
                 .map(|e| quote!(#e))
                 .unwrap_or(quote!(""));
-            let kind = quote! { ::zenode::ParamKind::Str { default: #default_lit } };
+            let kind = quote! { ::zennode::ParamKind::Str { default: #default_lit } };
             let default_expr = attrs
                 .default
                 .as_ref()
-                .map(|e| quote!(::zenode::__private::String::from(#e)))
-                .unwrap_or_else(|| quote!(::zenode::__private::String::new()));
+                .map(|e| quote!(::zennode::__private::String::from(#e)))
+                .unwrap_or_else(|| quote!(::zennode::__private::String::new()));
             Ok((kind, "Str", default_expr, None))
         }
     }
@@ -502,26 +502,26 @@ fn gen_to_params(
     if parse_f32_array(&type_str).is_some() {
         return quote! {
             __map.insert(
-                ::zenode::__private::String::from(#field_name_str),
-                ::zenode::ParamValue::F32Array(::zenode::__private::Vec::from(self.#field_name.as_slice())),
+                ::zennode::__private::String::from(#field_name_str),
+                ::zennode::ParamValue::F32Array(::zennode::__private::Vec::from(self.#field_name.as_slice())),
             );
         };
     }
     match type_str.as_str() {
         "f32" => quote! {
-            __map.insert(::zenode::__private::String::from(#field_name_str), ::zenode::ParamValue::F32(self.#field_name));
+            __map.insert(::zennode::__private::String::from(#field_name_str), ::zennode::ParamValue::F32(self.#field_name));
         },
         "i32" => quote! {
-            __map.insert(::zenode::__private::String::from(#field_name_str), ::zenode::ParamValue::I32(self.#field_name));
+            __map.insert(::zennode::__private::String::from(#field_name_str), ::zennode::ParamValue::I32(self.#field_name));
         },
         "u32" => quote! {
-            __map.insert(::zenode::__private::String::from(#field_name_str), ::zenode::ParamValue::U32(self.#field_name));
+            __map.insert(::zennode::__private::String::from(#field_name_str), ::zennode::ParamValue::U32(self.#field_name));
         },
         "bool" => quote! {
-            __map.insert(::zenode::__private::String::from(#field_name_str), ::zenode::ParamValue::Bool(self.#field_name));
+            __map.insert(::zennode::__private::String::from(#field_name_str), ::zennode::ParamValue::Bool(self.#field_name));
         },
         _ => quote! {
-            __map.insert(::zenode::__private::String::from(#field_name_str), ::zenode::ParamValue::Str(::zenode::__private::ToString::to_string(&self.#field_name)));
+            __map.insert(::zennode::__private::String::from(#field_name_str), ::zennode::ParamValue::Str(::zennode::__private::ToString::to_string(&self.#field_name)));
         },
     }
 }
@@ -536,17 +536,17 @@ fn gen_get_param(
     if parse_f32_array(&type_str).is_some() {
         return quote! {
             #field_name_str => ::core::option::Option::Some(
-                ::zenode::ParamValue::F32Array(::zenode::__private::Vec::from(self.#field_name.as_slice()))
+                ::zennode::ParamValue::F32Array(::zennode::__private::Vec::from(self.#field_name.as_slice()))
             ),
         };
     }
     let value_expr = match type_str.as_str() {
-        "f32" => quote! { ::zenode::ParamValue::F32(self.#field_name) },
-        "i32" => quote! { ::zenode::ParamValue::I32(self.#field_name) },
-        "u32" => quote! { ::zenode::ParamValue::U32(self.#field_name) },
-        "bool" => quote! { ::zenode::ParamValue::Bool(self.#field_name) },
+        "f32" => quote! { ::zennode::ParamValue::F32(self.#field_name) },
+        "i32" => quote! { ::zennode::ParamValue::I32(self.#field_name) },
+        "u32" => quote! { ::zennode::ParamValue::U32(self.#field_name) },
+        "bool" => quote! { ::zennode::ParamValue::Bool(self.#field_name) },
         _ => {
-            quote! { ::zenode::ParamValue::Str(::zenode::__private::ToString::to_string(&self.#field_name)) }
+            quote! { ::zennode::ParamValue::Str(::zennode::__private::ToString::to_string(&self.#field_name)) }
         }
     };
     quote! {
@@ -579,7 +579,7 @@ fn gen_set_param(
         "i32" => quote! { value.as_i32() },
         "u32" => quote! { value.as_u32() },
         "bool" => quote! { value.as_bool() },
-        _ => quote! { value.as_str().map(::zenode::__private::ToString::to_string) },
+        _ => quote! { value.as_str().map(::zennode::__private::ToString::to_string) },
     };
     let assign = quote! { self.#field_name = v; };
     quote! {

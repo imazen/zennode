@@ -1,11 +1,11 @@
-# zenode API Specification
+# zennode API Specification
 
-Canonical reference for the zenode public API. Keep this in sync with the code.
+Canonical reference for the zennode public API. Keep this in sync with the code.
 
 ## Crate Overview
 
-`zenode` — self-documenting node definitions for image processing pipelines.
-`zenode-derive` — `#[derive(Node)]` and `#[derive(NodeEnum)]` proc macros.
+`zennode` — self-documenting node definitions for image processing pipelines.
+`zennode-derive` — `#[derive(Node)]` and `#[derive(NodeEnum)]` proc macros.
 
 No external dependencies beyond `core` + `alloc`. Optional features: `derive` (default), `std` (default), `serde`, `json-schema`.
 
@@ -120,7 +120,7 @@ Adjacent nodes in the same coalesce group are fused into a single operation. The
 
 ## Ordering Model
 
-**zenode does NOT reorder user-specified node sequences.** Nodes execute in the order the user declared them (RIAPI querystring position, JSON array index, or DAG edges).
+**zennode does NOT reorder user-specified node sequences.** Nodes execute in the order the user declared them (RIAPI querystring position, JSON array index, or DAG edges).
 
 `NodeRole` is a **type tag** that tells the pipeline bridge what kind of planner a node feeds into. The bridge walks the user's node list left-to-right, accumulating runs of compatible nodes. When the role changes, it flushes the accumulated run to its planner and starts a new run.
 
@@ -234,7 +234,7 @@ On variants:
 
 Doc comments become variant descriptions. Names convert to snake_case.
 
-**Generates:** `zenode_variants() -> &[EnumVariant]`, `zenode_name() -> &str`, `Display`, `FromStr`.
+**Generates:** `zennode_variants() -> &[EnumVariant]`, `zennode_name() -> &str`, `Display`, `FromStr`.
 
 ### Generated Items from `#[derive(Node)]`
 
@@ -259,7 +259,7 @@ For struct `Foo`:
 
 ## Built-in Nodes
 
-### `zenode.decode` (in zenode)
+### `zennode.decode` (in zennode)
 
 Format-independent decode configuration:
 - `io_id` (i32) — I/O slot identifier
@@ -267,9 +267,9 @@ Format-independent decode configuration:
 - `color_intent` (String) — "preserve" (default), "srgb"
 - `min_size` (u32) — JPEG prescale hint (0 = none)
 
-### `zencodecs.quality_intent` (in zencodecs, feature `zenode`)
+### `zencodecs.quality_intent` (in zencodecs, feature `zennode`)
 
-Format selection and quality profile. QualityIntent moved from zenode to zencodecs because it's about codec selection (zencodecs' domain). Maps to imageflow's `EncoderPreset::Auto`.
+Format selection and quality profile. QualityIntent moved from zennode to zencodecs because it's about codec selection (zencodecs' domain). Maps to imageflow's `EncoderPreset::Auto`.
 
 - `profile` (String) — "lowest"→"lossless" or 0-100. KV: `qp`
 - `format` (String) — "" (auto), "jpeg", "webp", etc. KV: `format`
@@ -303,7 +303,7 @@ Has `to_codec_intent()` → `CodecIntent` for resolution via zencodecs' selectio
 - `ParamValue` serializes untagged (f32 → number, bool → boolean, etc.)
 - Schema types (`NodeSchema`, `ParamDesc`, etc.) implement `Serialize` only
 - Enums serialize as snake_case strings
-- `x-zenode-*` JSON Schema extensions for slider mappings, units, identity values
+- `x-zennode-*` JSON Schema extensions for slider mappings, units, identity values
 
 ## Error Types
 
@@ -311,25 +311,25 @@ Has `to_codec_intent()` → `CodecIntent` for resolution via zencodecs' selectio
 
 ## Architecture: Where Nodes Live
 
-zenode itself only defines infrastructure + the `Decode` node. All other nodes live in their respective crates:
+zennode itself only defines infrastructure + the `Decode` node. All other nodes live in their respective crates:
 
 | Crate | Nodes | Feature |
 |-------|-------|---------|
-| zenode | `Decode` | always |
-| zencodecs | `QualityIntentNode` | `zenode` |
-| zenjpeg | `EncodeJpeg` | `zenode` |
-| zenpng | `EncodePng` | `zenode` |
-| zenwebp | `EncodeWebpLossy`, `EncodeWebpLossless` | `zenode` |
-| zengif | `EncodeGif` | `zenode` |
-| zenavif | `EncodeAvif` | `zenode` |
-| zenjxl | `EncodeJxl` | `zenode` |
-| zentiff | `EncodeTiff` | `zenode` |
-| zenbitmaps | `EncodeBmp` | `zenode` |
-| zenresize | `Constrain` | `zenode` |
-| zenlayout | `Crop`, `Orient`, `FlipH/V`, `Rotate*`, `ExpandCanvas`, `Constrain` | `zenode` |
-| zenfilters | 35 filter nodes | `zenode` |
-| zenblend | `Composite` + `BlendModeEnum` | `zenode` |
-| zenquant | `Quantize` | `zenode` |
+| zennode | `Decode` | always |
+| zencodecs | `QualityIntentNode` | `zennode` |
+| zenjpeg | `EncodeJpeg` | `zennode` |
+| zenpng | `EncodePng` | `zennode` |
+| zenwebp | `EncodeWebpLossy`, `EncodeWebpLossless` | `zennode` |
+| zengif | `EncodeGif` | `zennode` |
+| zenavif | `EncodeAvif` | `zennode` |
+| zenjxl | `EncodeJxl` | `zennode` |
+| zentiff | `EncodeTiff` | `zennode` |
+| zenbitmaps | `EncodeBmp` | `zennode` |
+| zenresize | `Constrain` | `zennode` |
+| zenlayout | `Crop`, `Orient`, `FlipH/V`, `Rotate*`, `ExpandCanvas`, `Constrain` | `zennode` |
+| zenfilters | 35 filter nodes | `zennode` |
+| zenblend | `Composite` + `BlendModeEnum` | `zennode` |
+| zenquant | `Quantize` | `zennode` |
 
 ## Pipeline Integration (zenpipe)
 

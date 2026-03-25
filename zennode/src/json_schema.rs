@@ -1,7 +1,7 @@
 //! JSON Schema generation from node schemas.
 #![allow(unreachable_patterns)]
 //!
-//! Generates JSON Schema 2020-12 documents with `x-zenode-*` extensions
+//! Generates JSON Schema 2020-12 documents with `x-zennode-*` extensions
 //! for slider mappings, units, sections, identity values, and pipeline metadata.
 
 extern crate std;
@@ -26,22 +26,22 @@ pub fn node_to_json_schema(schema: &NodeSchema) -> Value {
         "description": schema.description,
         "properties": properties,
         "additionalProperties": false,
-        "x-zenode-id": schema.id,
-        "x-zenode-group": serde_json::to_value(schema.group).unwrap_or(Value::Null),
-        "x-zenode-role": serde_json::to_value(schema.role).unwrap_or(Value::Null),
-        "x-zenode-version": schema.version,
-        "x-zenode-compat-version": schema.compat_version,
+        "x-zennode-id": schema.id,
+        "x-zennode-group": serde_json::to_value(schema.group).unwrap_or(Value::Null),
+        "x-zennode-role": serde_json::to_value(schema.role).unwrap_or(Value::Null),
+        "x-zennode-version": schema.version,
+        "x-zennode-compat-version": schema.compat_version,
     });
 
     if !schema.tags.is_empty() {
-        node_schema["x-zenode-tags"] = json!(schema.tags);
+        node_schema["x-zennode-tags"] = json!(schema.tags);
     }
 
     if let Some(ref coalesce) = schema.coalesce {
-        node_schema["x-zenode-coalesce"] = serde_json::to_value(coalesce).unwrap_or(Value::Null);
+        node_schema["x-zennode-coalesce"] = serde_json::to_value(coalesce).unwrap_or(Value::Null);
     }
 
-    node_schema["x-zenode-format"] = serde_json::to_value(schema.format).unwrap_or(Value::Null);
+    node_schema["x-zennode-format"] = serde_json::to_value(schema.format).unwrap_or(Value::Null);
 
     if !required.is_empty() {
         node_schema["required"] = json!(required);
@@ -94,8 +94,8 @@ fn param_to_schema(param: &ParamDesc) -> Value {
                 "maximum": max,
                 "default": default,
             });
-            s["x-zenode-identity"] = json!(identity);
-            s["x-zenode-step"] = json!(step);
+            s["x-zennode-identity"] = json!(identity);
+            s["x-zennode-step"] = json!(step);
             s
         }
         ParamKind::Int { min, max, default } => json!({
@@ -134,7 +134,7 @@ fn param_to_schema(param: &ParamDesc) -> Value {
                 "type": "string",
                 "enum": names,
                 "default": default,
-                "x-zenode-enum-labels": labels,
+                "x-zennode-enum-labels": labels,
             })
         }
         ParamKind::FloatArray {
@@ -149,7 +149,7 @@ fn param_to_schema(param: &ParamDesc) -> Value {
             "minItems": len,
             "maxItems": len,
             "default": std::vec![*default; *len],
-            "x-zenode-labels": labels,
+            "x-zennode-labels": labels,
         }),
         ParamKind::Color { default } => json!({
             "type": "array",
@@ -157,7 +157,7 @@ fn param_to_schema(param: &ParamDesc) -> Value {
             "minItems": 4,
             "maxItems": 4,
             "default": default,
-            "x-zenode-color": true,
+            "x-zennode-color": true,
         }),
         _ => json!({ "type": "string" }),
     };
@@ -168,20 +168,20 @@ fn param_to_schema(param: &ParamDesc) -> Value {
         schema["description"] = json!(param.description);
     }
     if !param.unit.is_empty() {
-        schema["x-zenode-unit"] = json!(param.unit);
+        schema["x-zennode-unit"] = json!(param.unit);
     }
     if !param.section.is_empty() {
-        schema["x-zenode-section"] = json!(param.section);
+        schema["x-zennode-section"] = json!(param.section);
     }
-    schema["x-zenode-slider"] = serde_json::to_value(param.slider).unwrap_or(Value::Null);
+    schema["x-zennode-slider"] = serde_json::to_value(param.slider).unwrap_or(Value::Null);
     if !param.kv_keys.is_empty() {
-        schema["x-zenode-kv-keys"] = json!(param.kv_keys);
+        schema["x-zennode-kv-keys"] = json!(param.kv_keys);
     }
     if param.since_version > 1 {
-        schema["x-zenode-since-version"] = json!(param.since_version);
+        schema["x-zennode-since-version"] = json!(param.since_version);
     }
     if !param.visible_when.is_empty() {
-        schema["x-zenode-visible-when"] = json!(param.visible_when);
+        schema["x-zennode-visible-when"] = json!(param.visible_when);
     }
 
     schema

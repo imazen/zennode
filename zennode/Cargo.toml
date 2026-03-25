@@ -1,5 +1,5 @@
 [package]
-name = "zenode"
+name = "zennode"
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.85"
@@ -9,11 +9,11 @@ description = "Self-documenting node definitions for image processing pipelines"
 [features]
 default = ["std", "derive"]
 std = []
-derive = ["dep:zenode-derive"]
+derive = ["dep:zennode-derive"]
 serde = ["dep:serde", "dep:serde_json", "std"]
 json-schema = ["serde"]
 
 [dependencies]
-zenode-derive = { version = "0.1", path = "../zenode-derive", optional = true }
+zennode-derive = { version = "0.1", path = "../zennode-derive", optional = true }
 serde = { version = "1", default-features = false, features = ["derive", "alloc"], optional = true }
 serde_json = { version = "1", optional = true }

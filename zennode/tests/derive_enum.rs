@@ -4,7 +4,7 @@ extern crate alloc;
 
 use core::str::FromStr;
 
-use zenode::*;
+use zennode::*;
 
 /// Edge detection algorithm.
 #[derive(NodeEnum, Clone, Copy, Debug, PartialEq, Eq)]
@@ -23,7 +23,7 @@ pub enum EdgeMode {
 
 #[test]
 fn enum_variants_metadata() {
-    let variants = EdgeMode::zenode_variants();
+    let variants = EdgeMode::zennode_variants();
     assert_eq!(variants.len(), 4);
     assert_eq!(variants[0].name, "sobel");
     assert_eq!(variants[0].label, "Sobel");
@@ -51,16 +51,16 @@ fn enum_from_str() {
 }
 
 #[test]
-fn enum_zenode_name() {
-    assert_eq!(EdgeMode::Sobel.zenode_name(), "sobel");
-    assert_eq!(EdgeMode::Laplacian.zenode_name(), "laplacian");
-    assert_eq!(EdgeMode::Canny.zenode_name(), "canny");
-    assert_eq!(EdgeMode::Roberts.zenode_name(), "roberts");
+fn enum_zennode_name() {
+    assert_eq!(EdgeMode::Sobel.zennode_name(), "sobel");
+    assert_eq!(EdgeMode::Laplacian.zennode_name(), "laplacian");
+    assert_eq!(EdgeMode::Canny.zennode_name(), "canny");
+    assert_eq!(EdgeMode::Roberts.zennode_name(), "roberts");
 }
 
 #[test]
 fn enum_doc_comments() {
-    let variants = EdgeMode::zenode_variants();
+    let variants = EdgeMode::zennode_variants();
     assert!(variants[0].description.contains("Sobel operator"));
     assert!(variants[2].description.contains("Canny edge detector"));
 }

@@ -1,13 +1,13 @@
 //! Self-documenting node definitions for image processing pipelines.
 //!
-//! `zenode` provides a trait-based system for defining pipeline operations
+//! `zennode` provides a trait-based system for defining pipeline operations
 //! with full parameter schemas, RIAPI querystring parsing, and JSON Schema
 //! generation — all with permanent backwards compatibility.
 //!
 //! # Quick Start
 //!
 //! ```rust,ignore
-//! use zenode::*;
+//! use zennode::*;
 //!
 //! #[derive(Node, Clone, Debug, Default)]
 //! #[node(id = "myfilter.brightness", group = Tone, role = Filter)]
@@ -34,8 +34,8 @@ extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std;
 
-// Allow the derive macro (which emits `::zenode::`) to work inside this crate.
-extern crate self as zenode;
+// Allow the derive macro (which emits `::zennode::`) to work inside this crate.
+extern crate self as zennode;
 
 pub mod error;
 pub mod format;
@@ -47,6 +47,7 @@ pub mod schema;
 pub mod traits;
 pub mod version;
 
+/// zennode does not define any built-in nodes. See [`nodes`] module docs.
 #[cfg(feature = "derive")]
 pub mod nodes;
 
@@ -71,7 +72,7 @@ pub use version::VersionSet;
 
 // Re-export derive macros
 #[cfg(feature = "derive")]
-pub use zenode_derive::{Node, NodeEnum};
+pub use zennode_derive::{Node, NodeEnum};
 
 /// Private re-exports used by the derive macro. Not public API.
 #[doc(hidden)]

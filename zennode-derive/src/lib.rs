@@ -1,4 +1,4 @@
-//! Derive macros for zenode node definitions.
+//! Derive macros for zennode node definitions.
 //!
 //! Provides `#[derive(Node)]` for structs and `#[derive(NodeEnum)]` for enums.
 

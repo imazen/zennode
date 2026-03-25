@@ -11,16 +11,16 @@ pub fn format_hint_tokens(
     is_neighborhood: bool,
 ) -> TokenStream {
     let preferred = match preferred {
-        Some(p) => quote! { ::zenode::PixelFormatPreference::#p },
-        None => quote! { ::zenode::PixelFormatPreference::Any },
+        Some(p) => quote! { ::zennode::PixelFormatPreference::#p },
+        None => quote! { ::zennode::PixelFormatPreference::Any },
     };
     let alpha = match alpha {
-        Some(a) => quote! { ::zenode::AlphaHandling::#a },
-        None => quote! { ::zenode::AlphaHandling::Process },
+        Some(a) => quote! { ::zennode::AlphaHandling::#a },
+        None => quote! { ::zennode::AlphaHandling::Process },
     };
 
     quote! {
-        ::zenode::FormatHint {
+        ::zennode::FormatHint {
             preferred: #preferred,
             alpha: #alpha,
             changes_dimensions: #changes_dimensions,
@@ -37,14 +37,14 @@ pub fn coalesce_tokens(
 ) -> TokenStream {
     match coalesce_group {
         Some(group) => quote! {
-            ::core::option::Option::Some(::zenode::CoalesceInfo {
+            ::core::option::Option::Some(::zennode::CoalesceInfo {
                 group: #group,
                 fusable: #fusable,
                 is_target: #is_target,
             })
         },
         None if fusable => quote! {
-            ::core::option::Option::Some(::zenode::CoalesceInfo {
+            ::core::option::Option::Some(::zennode::CoalesceInfo {
                 group: "",
                 fusable: true,
                 is_target: #is_target,

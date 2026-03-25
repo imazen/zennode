@@ -1,4 +1,4 @@
-//! Serde support for zenode types.
+//! Serde support for zennode types.
 //!
 //! Wildcard arms on `#[non_exhaustive]` enums are intentional for forward compatibility.
 #![allow(unreachable_patterns)]

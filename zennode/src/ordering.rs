@@ -2,7 +2,7 @@
 //!
 //! # Ordering Model
 //!
-//! zenode does NOT reorder user-specified node sequences. Nodes execute in
+//! zennode does NOT reorder user-specified node sequences. Nodes execute in
 //! the order the user declared them (RIAPI querystring position, JSON array
 //! index, or DAG edges).
 //!

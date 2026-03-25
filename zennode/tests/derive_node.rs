@@ -2,7 +2,7 @@
 
 extern crate alloc;
 
-use zenode::*;
+use zennode::*;
 
 /// Exposure adjustment in photographic stops.
 /// Each stop doubles or halves brightness.

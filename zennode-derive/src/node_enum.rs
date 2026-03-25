@@ -70,7 +70,7 @@ fn derive_node_enum_inner(input: &DeriveInput) -> syn::Result<TokenStream2> {
             custom_label.unwrap_or_else(|| attrs::ident_to_label(&variant_ident.to_string()));
 
         variant_descriptors.push(quote! {
-            ::zenode::EnumVariant {
+            ::zennode::EnumVariant {
                 name: #snake_name,
                 label: #label,
                 description: #doc,
@@ -99,18 +99,18 @@ fn derive_node_enum_inner(input: &DeriveInput) -> syn::Result<TokenStream2> {
     );
 
     Ok(quote! {
-        static #variants_name: [::zenode::EnumVariant; #num_variants] = [
+        static #variants_name: [::zennode::EnumVariant; #num_variants] = [
             #(#variant_descriptors),*
         ];
 
         impl #enum_name {
             /// Static variant descriptors for schema generation.
-            pub fn zenode_variants() -> &'static [::zenode::EnumVariant] {
+            pub fn zennode_variants() -> &'static [::zennode::EnumVariant] {
                 &#variants_name
             }
 
             /// Get the snake_case name for this variant.
-            pub fn zenode_name(&self) -> &'static str {
+            pub fn zennode_name(&self) -> &'static str {
                 match self {
                     #(#name_arms)*
                 }
@@ -119,19 +119,19 @@ fn derive_node_enum_inner(input: &DeriveInput) -> syn::Result<TokenStream2> {
 
         impl ::core::fmt::Display for #enum_name {
             fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-                f.write_str(self.zenode_name())
+                f.write_str(self.zennode_name())
             }
         }
 
         impl ::core::str::FromStr for #enum_name {
-            type Err = ::zenode::NodeError;
+            type Err = ::zennode::NodeError;
             fn from_str(s: &str) -> ::core::result::Result<Self, Self::Err> {
                 match s {
                     #(#from_str_arms)*
                     _ => {
-                        let mut msg = ::zenode::__private::String::from("unknown variant: ");
+                        let mut msg = ::zennode::__private::String::from("unknown variant: ");
                         msg.push_str(s);
-                        ::core::result::Result::Err(::zenode::NodeError::Other(msg))
+                        ::core::result::Result::Err(::zennode::NodeError::Other(msg))
                     }
                 }
             }
