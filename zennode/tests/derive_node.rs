@@ -477,3 +477,174 @@ fn bw_mixer_identity() {
     };
     assert!(!node2.is_identity());
 }
+
+// ─── Option<T> tests ───
+
+/// Constraint with optional fields — models imageflow-style ergonomics.
+#[derive(Node, Clone, Debug, Default)]
+#[node(id = "test.constrain_opt", group = Layout, role = Geometry)]
+#[node(changes_dimensions)]
+pub struct ConstrainOpt {
+    /// Target width. None = unconstrained.
+    #[param(range(0..=65535), default = 0, step = 1)]
+    #[param(unit = "px", section = "Main")]
+    #[kv("w")]
+    pub w: Option<u32>,
+
+    /// Target height. None = unconstrained.
+    #[param(range(0..=65535), default = 0, step = 1)]
+    #[param(unit = "px", section = "Main")]
+    #[kv("h")]
+    pub h: Option<u32>,
+
+    /// Resampling filter. None = auto-select.
+    #[param(default = "lanczos")]
+    #[param(section = "Hints")]
+    #[kv("filter")]
+    pub filter: Option<String>,
+
+    /// Sharpening percentage. None = no sharpening.
+    #[param(range(0.0..=100.0), default = 0.0, step = 0.1)]
+    #[param(unit = "%", section = "Hints")]
+    #[kv("sharpen")]
+    pub sharpen: Option<f32>,
+
+    /// Whether to process in linear light. None = auto.
+    #[param(default = true)]
+    #[param(section = "Hints")]
+    pub linear: Option<bool>,
+}
+
+#[test]
+fn optional_schema_marks_optional() {
+    let schema = CONSTRAIN_OPT_NODE.schema();
+    assert_eq!(schema.id, "test.constrain_opt");
+    assert_eq!(schema.params.len(), 5);
+    for p in schema.params {
+        assert!(p.optional, "param {} should be optional", p.name);
+    }
+}
+
+#[test]
+fn optional_defaults_are_none() {
+    let node = CONSTRAIN_OPT_NODE.create_default().unwrap();
+    assert_eq!(node.get_param("w"), Some(ParamValue::None));
+    assert_eq!(node.get_param("h"), Some(ParamValue::None));
+    assert_eq!(node.get_param("filter"), Some(ParamValue::None));
+    assert_eq!(node.get_param("sharpen"), Some(ParamValue::None));
+    assert_eq!(node.get_param("linear"), Some(ParamValue::None));
+}
+
+#[test]
+fn optional_set_and_get() {
+    let mut params = ParamMap::new();
+    params.insert("w".into(), ParamValue::U32(800));
+    params.insert("filter".into(), ParamValue::Str("lanczos".into()));
+    params.insert("sharpen".into(), ParamValue::F32(15.0));
+    // h and linear left as None
+
+    let node = CONSTRAIN_OPT_NODE.create(&params).unwrap();
+    assert_eq!(node.get_param("w"), Some(ParamValue::U32(800)));
+    assert_eq!(node.get_param("h"), Some(ParamValue::None));
+    assert_eq!(
+        node.get_param("filter"),
+        Some(ParamValue::Str("lanczos".into()))
+    );
+    assert_eq!(node.get_param("sharpen"), Some(ParamValue::F32(15.0)));
+    assert_eq!(node.get_param("linear"), Some(ParamValue::None));
+}
+
+#[test]
+fn optional_set_then_clear_with_none() {
+    let mut node = ConstrainOpt {
+        w: Some(800),
+        h: Some(600),
+        filter: Some("lanczos".into()),
+        sharpen: Some(15.0),
+        linear: Some(true),
+    };
+
+    // Clear w with ParamValue::None
+    assert!(node.set_param("w", ParamValue::None));
+    assert_eq!(node.w, None);
+    assert_eq!(node.get_param("w"), Some(ParamValue::None));
+
+    // Clear filter
+    assert!(node.set_param("filter", ParamValue::None));
+    assert_eq!(node.filter, None);
+
+    // h should still be set
+    assert_eq!(node.h, Some(600));
+}
+
+#[test]
+fn optional_downcast() {
+    let mut params = ParamMap::new();
+    params.insert("w".into(), ParamValue::U32(1920));
+    params.insert("sharpen".into(), ParamValue::F32(10.0));
+
+    let node = CONSTRAIN_OPT_NODE.create(&params).unwrap();
+    let c = node.as_any().downcast_ref::<ConstrainOpt>().unwrap();
+    assert_eq!(c.w, Some(1920));
+    assert_eq!(c.h, None);
+    assert_eq!(c.filter, None);
+    assert_eq!(c.sharpen, Some(10.0));
+    assert_eq!(c.linear, None);
+}
+
+#[test]
+fn optional_to_params_round_trip() {
+    let original = ConstrainOpt {
+        w: Some(800),
+        h: None,
+        filter: Some("ginseng".into()),
+        sharpen: None,
+        linear: Some(false),
+    };
+    let params = original.to_params();
+
+    // Verify the ParamMap
+    assert_eq!(params.get("w"), Some(&ParamValue::U32(800)));
+    assert_eq!(params.get("h"), Some(&ParamValue::None));
+    assert_eq!(
+        params.get("filter"),
+        Some(&ParamValue::Str("ginseng".into()))
+    );
+    assert_eq!(params.get("sharpen"), Some(&ParamValue::None));
+    assert_eq!(params.get("linear"), Some(&ParamValue::Bool(false)));
+
+    // Round-trip through create
+    let node = CONSTRAIN_OPT_NODE.create(&params).unwrap();
+    let restored = node.as_any().downcast_ref::<ConstrainOpt>().unwrap();
+    assert_eq!(restored.w, Some(800));
+    assert_eq!(restored.h, None);
+    assert_eq!(restored.filter.as_deref(), Some("ginseng"));
+    assert_eq!(restored.sharpen, None);
+    assert_eq!(restored.linear, Some(false));
+}
+
+#[test]
+fn optional_from_kv() {
+    let mut kv = KvPairs::from_querystring("w=1024&sharpen=20.0");
+    let node = CONSTRAIN_OPT_NODE.from_kv(&mut kv).unwrap().unwrap();
+    assert_eq!(node.get_param("w"), Some(ParamValue::U32(1024)));
+    assert_eq!(node.get_param("h"), Some(ParamValue::None));
+    assert_eq!(node.get_param("sharpen"), Some(ParamValue::F32(20.0)));
+    assert_eq!(node.get_param("filter"), Some(ParamValue::None));
+    assert_eq!(kv.unconsumed().count(), 0);
+}
+
+#[test]
+fn optional_from_kv_no_match() {
+    let mut kv = KvPairs::from_querystring("quality=85");
+    let result = CONSTRAIN_OPT_NODE.from_kv(&mut kv).unwrap();
+    assert!(result.is_none());
+}
+
+#[test]
+fn non_optional_params_not_marked_optional() {
+    let schema = EXPOSURE_NODE.schema();
+    for p in schema.params {
+        assert!(!p.optional, "param {} should not be optional", p.name);
+    }
+}

@@ -789,15 +789,17 @@ fn gen_from_kv(
     kv_keys: &[syn::LitStr],
     field_type: &syn::Type,
     node_id: &syn::LitStr,
+    is_optional: bool,
 ) -> TokenStream2 {
     let type_str = quote!(#field_type).to_string().replace(' ', "");
+    let inner_str = parse_option_inner(&type_str).unwrap_or(&type_str);
 
     // Arrays don't come from querystrings — skip
-    if parse_f32_array(&type_str).is_some() {
+    if parse_f32_array(inner_str).is_some() {
         return quote! {};
     }
 
-    let take_method = match type_str.as_str() {
+    let take_method = match inner_str {
         "f32" => quote! { take_f32 },
         "i32" => quote! { take_i32 },
         "u32" => quote! { take_u32 },
@@ -806,12 +808,18 @@ fn gen_from_kv(
         _ => quote! { take_owned },
     };
 
+    let assign = if is_optional {
+        quote! { ::core::option::Option::Some(__v) }
+    } else {
+        quote! { __v }
+    };
+
     let first_key = &kv_keys[0];
     let rest_keys = &kv_keys[1..];
 
     let mut chain = quote! {
         if let ::core::option::Option::Some(__v) = kv.#take_method(#first_key, #node_id) {
-            __node.#field_name = __v;
+            __node.#field_name = #assign;
             __matched = true;
         }
     };
@@ -820,7 +828,7 @@ fn gen_from_kv(
         chain = quote! {
             #chain
             else if let ::core::option::Option::Some(__v) = kv.#take_method(#key, #node_id) {
-                __node.#field_name = __v;
+                __node.#field_name = #assign;
                 __matched = true;
             }
         };
@@ -833,14 +841,28 @@ fn gen_identity_check(
     field_name: &syn::Ident,
     field_type: &syn::Type,
     identity_expr: &TokenStream2,
+    is_optional: bool,
 ) -> TokenStream2 {
     let type_str = quote!(#field_type).to_string().replace(' ', "");
-    if parse_f32_array(&type_str).is_some() {
+    let inner_str = parse_option_inner(&type_str).unwrap_or(&type_str);
+
+    if parse_f32_array(inner_str).is_some() {
+        if is_optional {
+            return quote! { self.#field_name.as_ref().map_or(true, |a| a.iter().all(|v| (v - #identity_expr).abs() < 1e-6)) };
+        }
         return quote! { self.#field_name.iter().all(|v| (v - #identity_expr).abs() < 1e-6) };
     }
-    match type_str.as_str() {
-        "f32" => quote! { (self.#field_name - #identity_expr).abs() < 1e-6 },
-        _ => quote! { self.#field_name == #identity_expr },
+
+    if is_optional {
+        match inner_str {
+            "f32" => quote! { self.#field_name.map_or(true, |v| (v - #identity_expr).abs() < 1e-6) },
+            _ => quote! { self.#field_name.as_ref().map_or(true, |v| *v == #identity_expr) },
+        }
+    } else {
+        match inner_str {
+            "f32" => quote! { (self.#field_name - #identity_expr).abs() < 1e-6 },
+            _ => quote! { self.#field_name == #identity_expr },
+        }
     }
 }
 
