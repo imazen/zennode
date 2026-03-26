@@ -8,6 +8,11 @@ use alloc::vec::Vec;
 #[non_exhaustive]
 #[derive(Clone, Debug, PartialEq)]
 pub enum ParamValue {
+    /// Explicitly absent — the parameter is unset.
+    ///
+    /// Used for `Option<T>` fields: `None` in the Rust struct maps to
+    /// `ParamValue::None`, distinct from "set to default."
+    None,
     /// 32-bit float.
     F32(f32),
     /// Signed 32-bit integer.
@@ -27,6 +32,16 @@ pub enum ParamValue {
 }
 
 impl ParamValue {
+    /// Returns `true` if this is `ParamValue::None` (explicitly absent).
+    pub fn is_none(&self) -> bool {
+        matches!(self, Self::None)
+    }
+
+    /// Returns `true` if this is not `ParamValue::None`.
+    pub fn is_some(&self) -> bool {
+        !self.is_none()
+    }
+
     /// Try to extract as `f32`. Converts from `I32` and `U32` if possible.
     pub fn as_f32(&self) -> Option<f32> {
         match self {

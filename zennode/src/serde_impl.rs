@@ -15,6 +15,7 @@ use crate::schema::{EnumVariant, NodeGroup, NodeSchema, ParamDesc, ParamKind, Sl
 impl Serialize for ParamValue {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         match self {
+            Self::None => serializer.serialize_none(),
             Self::F32(v) => serializer.serialize_f32(*v),
             Self::I32(v) => serializer.serialize_i32(*v),
             Self::U32(v) => serializer.serialize_u32(*v),
@@ -35,6 +36,7 @@ impl<'de> Deserialize<'de> for ParamValue {
 
 fn json_to_param_value(value: &serde_json::Value) -> ParamValue {
     match value {
+        serde_json::Value::Null => ParamValue::None,
         serde_json::Value::Bool(b) => ParamValue::Bool(*b),
         serde_json::Value::Number(n) => {
             if let Some(i) = n.as_i64() {
@@ -253,7 +255,7 @@ impl Serialize for EnumVariant {
 impl Serialize for ParamDesc {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         use serde::ser::SerializeStruct;
-        let mut s = serializer.serialize_struct("ParamDesc", 10)?;
+        let mut s = serializer.serialize_struct("ParamDesc", 11)?;
         s.serialize_field("name", &self.name)?;
         s.serialize_field("label", &self.label)?;
         s.serialize_field("description", &self.description)?;
@@ -264,6 +266,7 @@ impl Serialize for ParamDesc {
         s.serialize_field("kv_keys", &self.kv_keys)?;
         s.serialize_field("since_version", &self.since_version)?;
         s.serialize_field("visible_when", &self.visible_when)?;
+        s.serialize_field("optional", &self.optional)?;
         s.end()
     }
 }

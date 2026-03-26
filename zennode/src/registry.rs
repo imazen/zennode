@@ -115,6 +115,17 @@ impl NodeRegistry {
             warnings,
         }
     }
+
+    /// Render all registered nodes as a Markdown reference document.
+    pub fn to_markdown(&self) -> alloc::string::String {
+        use alloc::fmt::Write;
+        let mut md = alloc::string::String::from("# Node Reference\n\n");
+        let _ = write!(md, "{} nodes registered.\n\n", self.nodes.len());
+        for def in &self.nodes {
+            md.push_str(&def.schema().to_markdown());
+        }
+        md
+    }
 }
 
 impl Default for NodeRegistry {

@@ -55,6 +55,65 @@ impl NodeSchema {
     pub fn phase(&self) -> NodeRole {
         self.role
     }
+
+    /// Render this schema as Markdown documentation.
+    pub fn to_markdown(&self) -> alloc::string::String {
+        use alloc::fmt::Write;
+        let mut md = alloc::string::String::new();
+        let _ = write!(md, "### `{}`\n\n", self.id);
+        if !self.description.is_empty() {
+            let _ = write!(md, "{}\n\n", self.description);
+        }
+        let _ = write!(md, "**Group:** {:?} | **Role:** {:?}", self.group, self.role);
+        if !self.tags.is_empty() {
+            let _ = write!(md, " | **Tags:** {}", self.tags.join(", "));
+        }
+        md.push_str("\n\n");
+        if !self.params.is_empty() {
+            md.push_str("| Parameter | Type | Default | Range | KV Keys | Description |\n");
+            md.push_str("|-----------|------|---------|-------|---------|-------------|\n");
+            for p in self.params {
+                let (ty, default, range) = match &p.kind {
+                    ParamKind::Float { min, max, default, .. } => {
+                        ("f32", alloc::format!("{default}"), alloc::format!("{min}..{max}"))
+                    }
+                    ParamKind::Int { min, max, default } => {
+                        ("i32", alloc::format!("{default}"), alloc::format!("{min}..{max}"))
+                    }
+                    ParamKind::U32 { min, max, default } => {
+                        ("u32", alloc::format!("{default}"), alloc::format!("{min}..{max}"))
+                    }
+                    ParamKind::Bool { default } => {
+                        ("bool", alloc::format!("{default}"), alloc::string::String::new())
+                    }
+                    ParamKind::Str { default } => {
+                        ("string", alloc::format!("\"{default}\""), alloc::string::String::new())
+                    }
+                    ParamKind::Enum { default, variants } => {
+                        let names: alloc::vec::Vec<&str> = variants.iter().map(|v| v.name).collect();
+                        ("enum", alloc::format!("\"{default}\""), names.join(" \\| "))
+                    }
+                    ParamKind::FloatArray { len, min, max, default, .. } => {
+                        ("f32[]", alloc::format!("[{default}; {len}]"), alloc::format!("{min}..{max}"))
+                    }
+                    ParamKind::Color { default } => {
+                        ("color", alloc::format!("{default:?}"), alloc::string::String::new())
+                    }
+                };
+                let keys = if p.kv_keys.is_empty() {
+                    alloc::string::String::from("—")
+                } else {
+                    p.kv_keys.iter().map(|k| alloc::format!("`{k}`")).collect::<alloc::vec::Vec<_>>().join(", ")
+                };
+                let _ = write!(
+                    md, "| `{}` | {} | {} | {} | {} | {} |\n",
+                    p.name, ty, default, range, keys, p.description.replace('\n', " "),
+                );
+            }
+            md.push('\n');
+        }
+        md
+    }
 }
 
 /// A single parameter descriptor.
@@ -88,6 +147,12 @@ pub struct ParamDesc {
 
     /// Conditional visibility expression: `"param_name=value"` or `""` for always visible.
     pub visible_when: &'static str,
+
+    /// Whether this parameter can be [`ParamValue::None`](crate::ParamValue::None) (explicitly absent).
+    ///
+    /// Optional parameters map to `Option<T>` fields in the Rust struct.
+    /// When `true`, UIs should distinguish "unset" from "set to default."
+    pub optional: bool,
 }
 
 /// Parameter type, range, and default value.

@@ -167,6 +167,13 @@ fn param_to_schema(param: &ParamDesc) -> Value {
     if !param.description.is_empty() {
         schema["description"] = json!(param.description);
     }
+    if param.optional {
+        // Wrap type in oneOf to allow null
+        if let Some(base_type) = schema.get("type").cloned() {
+            schema["type"] = json!([base_type, "null"]);
+        }
+        schema["x-zennode-optional"] = json!(true);
+    }
     if !param.unit.is_empty() {
         schema["x-zennode-unit"] = json!(param.unit);
     }

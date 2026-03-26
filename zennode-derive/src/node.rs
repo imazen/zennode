@@ -115,8 +115,10 @@ fn derive_node_inner(input: &DeriveInput) -> syn::Result<TokenStream2> {
         };
 
         // Determine ParamKind from field type and attributes
-        let (kind_tokens, value_variant, default_expr, identity_expr) =
-            field_param_kind(field_type, &param_attrs, &field_name_str)?;
+        let fk = field_param_kind(field_type, &param_attrs, &field_name_str)?;
+        let kind_tokens = &fk.kind_tokens;
+        let default_expr = &fk.default_expr;
+        let is_optional = fk.is_optional;
 
         param_desc_tokens.push(quote! {
             ::zennode::ParamDesc {
@@ -130,6 +132,7 @@ fn derive_node_inner(input: &DeriveInput) -> syn::Result<TokenStream2> {
                 kv_keys: #kv_keys_tokens,
                 since_version: #since,
                 visible_when: #visible_when,
+                optional: #is_optional,
             }
         });
 
@@ -138,7 +141,8 @@ fn derive_node_inner(input: &DeriveInput) -> syn::Result<TokenStream2> {
             field_name,
             &field_name_str,
             field_type,
-            value_variant,
+            fk.value_variant,
+            is_optional,
         ));
 
         // get_param
@@ -146,7 +150,8 @@ fn derive_node_inner(input: &DeriveInput) -> syn::Result<TokenStream2> {
             field_name,
             &field_name_str,
             field_type,
-            value_variant,
+            fk.value_variant,
+            is_optional,
         ));
 
         // set_param
@@ -154,7 +159,8 @@ fn derive_node_inner(input: &DeriveInput) -> syn::Result<TokenStream2> {
             field_name,
             &field_name_str,
             field_type,
-            value_variant,
+            fk.value_variant,
+            is_optional,
         ));
 
         // Default initializer
@@ -167,12 +173,13 @@ fn derive_node_inner(input: &DeriveInput) -> syn::Result<TokenStream2> {
                 &param_attrs.kv_keys,
                 field_type,
                 id,
+                is_optional,
             ));
         }
 
         // is_identity check
-        if let Some(id_expr) = &identity_expr {
-            identity_checks.push(gen_identity_check(field_name, field_type, id_expr));
+        if let Some(id_expr) = &fk.identity_expr {
+            identity_checks.push(gen_identity_check(field_name, field_type, id_expr, is_optional));
         }
     }
 
@@ -328,21 +335,55 @@ fn parse_f32_array(type_str: &str) -> Option<usize> {
     len_str.trim().parse::<usize>().ok()
 }
 
+/// Try to parse a type string as `Option<T>` and return the inner type string.
+fn parse_option_inner(type_str: &str) -> Option<&str> {
+    type_str.strip_prefix("Option<")?.strip_suffix('>')
+}
+
+/// Result from analyzing a field type: kind tokens, ParamValue variant name,
+/// default expression, identity expression, and whether the field is optional.
+struct FieldKindResult {
+    kind_tokens: TokenStream2,
+    value_variant: &'static str,
+    default_expr: TokenStream2,
+    identity_expr: Option<TokenStream2>,
+    is_optional: bool,
+}
+
 /// Determine ParamKind tokens, ParamValue variant, default expr, identity expr for a field.
 fn field_param_kind(
     ty: &syn::Type,
     attrs: &ParamAttrs,
     _field_name: &str,
-) -> syn::Result<(
-    TokenStream2,
-    &'static str,
-    TokenStream2,
-    Option<TokenStream2>,
-)> {
+) -> syn::Result<FieldKindResult> {
     let type_str = quote!(#ty).to_string().replace(' ', "");
 
+    // Check for Option<T> — unwrap and recurse on inner type
+    if let Some(inner) = parse_option_inner(&type_str) {
+        let inner_result = field_param_kind_str(inner, attrs)?;
+        // For optional fields, struct default is None
+        return Ok(FieldKindResult {
+            kind_tokens: inner_result.kind_tokens,
+            value_variant: inner_result.value_variant,
+            default_expr: quote! { ::core::option::Option::None },
+            identity_expr: inner_result.identity_expr,
+            is_optional: true,
+        });
+    }
+
+    field_param_kind_str(&type_str, attrs).map(|r| FieldKindResult {
+        is_optional: false,
+        ..r
+    })
+}
+
+/// Inner helper that works on a type string (for recursion from Option<T>).
+fn field_param_kind_str(
+    type_str: &str,
+    attrs: &ParamAttrs,
+) -> syn::Result<FieldKindResult> {
     // Check for [f32; N] array type before the scalar match
-    if let Some(len) = parse_f32_array(&type_str) {
+    if let Some(len) = parse_f32_array(type_str) {
         let min = attrs
             .range_min
             .as_ref()
@@ -371,10 +412,16 @@ fn field_param_kind(
         };
         let default_expr = quote! { [#default; #len] };
         let id_expr = attrs.identity.as_ref().map(|e| quote!(#e));
-        return Ok((kind, "F32Array", default_expr, id_expr));
+        return Ok(FieldKindResult {
+            kind_tokens: kind,
+            value_variant: "F32Array",
+            default_expr,
+            identity_expr: id_expr,
+            is_optional: false,
+        });
     }
 
-    match type_str.as_str() {
+    match type_str {
         "f32" => {
             let min = attrs
                 .range_min
@@ -407,7 +454,13 @@ fn field_param_kind(
                 }
             };
             let id_expr = attrs.identity.as_ref().map(|e| quote!(#e));
-            Ok((kind, "F32", default, id_expr))
+            Ok(FieldKindResult {
+                kind_tokens: kind,
+                value_variant: "F32",
+                default_expr: default,
+                identity_expr: id_expr,
+                is_optional: false,
+            })
         }
         "i32" => {
             let min = attrs
@@ -428,7 +481,13 @@ fn field_param_kind(
             let kind = quote! {
                 ::zennode::ParamKind::Int { min: #min, max: #max, default: #default }
             };
-            Ok((kind, "I32", default, None))
+            Ok(FieldKindResult {
+                kind_tokens: kind,
+                value_variant: "I32",
+                default_expr: default,
+                identity_expr: None,
+                is_optional: false,
+            })
         }
         "u32" => {
             let min = attrs
@@ -449,7 +508,13 @@ fn field_param_kind(
             let kind = quote! {
                 ::zennode::ParamKind::U32 { min: #min, max: #max, default: #default }
             };
-            Ok((kind, "U32", default, None))
+            Ok(FieldKindResult {
+                kind_tokens: kind,
+                value_variant: "U32",
+                default_expr: default,
+                identity_expr: None,
+                is_optional: false,
+            })
         }
         "bool" => {
             let default = attrs
@@ -458,7 +523,13 @@ fn field_param_kind(
                 .map(|e| quote!(#e))
                 .unwrap_or(quote!(false));
             let kind = quote! { ::zennode::ParamKind::Bool { default: #default } };
-            Ok((kind, "Bool", default, None))
+            Ok(FieldKindResult {
+                kind_tokens: kind,
+                value_variant: "Bool",
+                default_expr: default,
+                identity_expr: None,
+                is_optional: false,
+            })
         }
         "String" => {
             let default_lit = attrs
@@ -472,7 +543,13 @@ fn field_param_kind(
                 .as_ref()
                 .map(|e| quote!(::zennode::__private::String::from(#e)))
                 .unwrap_or_else(|| quote!(::zennode::__private::String::new()));
-            Ok((kind, "Str", default_expr, None))
+            Ok(FieldKindResult {
+                kind_tokens: kind,
+                value_variant: "Str",
+                default_expr,
+                identity_expr: None,
+                is_optional: false,
+            })
         }
         _ => {
             // Unknown type: treat as string
@@ -487,7 +564,13 @@ fn field_param_kind(
                 .as_ref()
                 .map(|e| quote!(::zennode::__private::String::from(#e)))
                 .unwrap_or_else(|| quote!(::zennode::__private::String::new()));
-            Ok((kind, "Str", default_expr, None))
+            Ok(FieldKindResult {
+                kind_tokens: kind,
+                value_variant: "Str",
+                default_expr,
+                identity_expr: None,
+                is_optional: false,
+            })
         }
     }
 }
@@ -497,9 +580,23 @@ fn gen_to_params(
     field_name_str: &str,
     field_type: &syn::Type,
     _variant: &str,
+    is_optional: bool,
 ) -> TokenStream2 {
     let type_str = quote!(#field_type).to_string().replace(' ', "");
-    if parse_f32_array(&type_str).is_some() {
+    let inner_str = parse_option_inner(&type_str).unwrap_or(&type_str);
+
+    if parse_f32_array(inner_str).is_some() {
+        if is_optional {
+            return quote! {
+                __map.insert(
+                    ::zennode::__private::String::from(#field_name_str),
+                    match &self.#field_name {
+                        ::core::option::Option::Some(__v) => ::zennode::ParamValue::F32Array(::zennode::__private::Vec::from(__v.as_slice())),
+                        ::core::option::Option::None => ::zennode::ParamValue::None,
+                    },
+                );
+            };
+        }
         return quote! {
             __map.insert(
                 ::zennode::__private::String::from(#field_name_str),
@@ -507,22 +604,45 @@ fn gen_to_params(
             );
         };
     }
-    match type_str.as_str() {
-        "f32" => quote! {
-            __map.insert(::zennode::__private::String::from(#field_name_str), ::zennode::ParamValue::F32(self.#field_name));
-        },
-        "i32" => quote! {
-            __map.insert(::zennode::__private::String::from(#field_name_str), ::zennode::ParamValue::I32(self.#field_name));
-        },
-        "u32" => quote! {
-            __map.insert(::zennode::__private::String::from(#field_name_str), ::zennode::ParamValue::U32(self.#field_name));
-        },
-        "bool" => quote! {
-            __map.insert(::zennode::__private::String::from(#field_name_str), ::zennode::ParamValue::Bool(self.#field_name));
-        },
-        _ => quote! {
-            __map.insert(::zennode::__private::String::from(#field_name_str), ::zennode::ParamValue::Str(::zennode::__private::ToString::to_string(&self.#field_name)));
-        },
+
+    let value_expr = match inner_str {
+        "f32" => quote! { ::zennode::ParamValue::F32 },
+        "i32" => quote! { ::zennode::ParamValue::I32 },
+        "u32" => quote! { ::zennode::ParamValue::U32 },
+        "bool" => quote! { ::zennode::ParamValue::Bool },
+        _ => {
+            // String or unknown type: use ToString
+            if is_optional {
+                return quote! {
+                    __map.insert(
+                        ::zennode::__private::String::from(#field_name_str),
+                        match &self.#field_name {
+                            ::core::option::Option::Some(__v) => ::zennode::ParamValue::Str(::zennode::__private::ToString::to_string(__v)),
+                            ::core::option::Option::None => ::zennode::ParamValue::None,
+                        },
+                    );
+                };
+            }
+            return quote! {
+                __map.insert(::zennode::__private::String::from(#field_name_str), ::zennode::ParamValue::Str(::zennode::__private::ToString::to_string(&self.#field_name)));
+            };
+        }
+    };
+
+    if is_optional {
+        quote! {
+            __map.insert(
+                ::zennode::__private::String::from(#field_name_str),
+                match self.#field_name {
+                    ::core::option::Option::Some(__v) => #value_expr(__v),
+                    ::core::option::Option::None => ::zennode::ParamValue::None,
+                },
+            );
+        }
+    } else {
+        quote! {
+            __map.insert(::zennode::__private::String::from(#field_name_str), #value_expr(self.#field_name));
+        }
     }
 }
 
@@ -531,26 +651,60 @@ fn gen_get_param(
     field_name_str: &str,
     field_type: &syn::Type,
     _variant: &str,
+    is_optional: bool,
 ) -> TokenStream2 {
     let type_str = quote!(#field_type).to_string().replace(' ', "");
-    if parse_f32_array(&type_str).is_some() {
+    let inner_str = parse_option_inner(&type_str).unwrap_or(&type_str);
+
+    if parse_f32_array(inner_str).is_some() {
+        if is_optional {
+            return quote! {
+                #field_name_str => ::core::option::Option::Some(match &self.#field_name {
+                    ::core::option::Option::Some(__v) => ::zennode::ParamValue::F32Array(::zennode::__private::Vec::from(__v.as_slice())),
+                    ::core::option::Option::None => ::zennode::ParamValue::None,
+                }),
+            };
+        }
         return quote! {
             #field_name_str => ::core::option::Option::Some(
                 ::zennode::ParamValue::F32Array(::zennode::__private::Vec::from(self.#field_name.as_slice()))
             ),
         };
     }
-    let value_expr = match type_str.as_str() {
-        "f32" => quote! { ::zennode::ParamValue::F32(self.#field_name) },
-        "i32" => quote! { ::zennode::ParamValue::I32(self.#field_name) },
-        "u32" => quote! { ::zennode::ParamValue::U32(self.#field_name) },
-        "bool" => quote! { ::zennode::ParamValue::Bool(self.#field_name) },
+
+    let value_ctor = match inner_str {
+        "f32" => quote! { ::zennode::ParamValue::F32 },
+        "i32" => quote! { ::zennode::ParamValue::I32 },
+        "u32" => quote! { ::zennode::ParamValue::U32 },
+        "bool" => quote! { ::zennode::ParamValue::Bool },
         _ => {
-            quote! { ::zennode::ParamValue::Str(::zennode::__private::ToString::to_string(&self.#field_name)) }
+            if is_optional {
+                return quote! {
+                    #field_name_str => ::core::option::Option::Some(match &self.#field_name {
+                        ::core::option::Option::Some(__v) => ::zennode::ParamValue::Str(::zennode::__private::ToString::to_string(__v)),
+                        ::core::option::Option::None => ::zennode::ParamValue::None,
+                    }),
+                };
+            }
+            return quote! {
+                #field_name_str => ::core::option::Option::Some(
+                    ::zennode::ParamValue::Str(::zennode::__private::ToString::to_string(&self.#field_name))
+                ),
+            };
         }
     };
-    quote! {
-        #field_name_str => ::core::option::Option::Some(#value_expr),
+
+    if is_optional {
+        quote! {
+            #field_name_str => ::core::option::Option::Some(match self.#field_name {
+                ::core::option::Option::Some(__v) => #value_ctor(__v),
+                ::core::option::Option::None => ::zennode::ParamValue::None,
+            }),
+        }
+    } else {
+        quote! {
+            #field_name_str => ::core::option::Option::Some(#value_ctor(self.#field_name)),
+        }
     }
 }
 
@@ -559,9 +713,31 @@ fn gen_set_param(
     field_name_str: &str,
     field_type: &syn::Type,
     _variant: &str,
+    is_optional: bool,
 ) -> TokenStream2 {
     let type_str = quote!(#field_type).to_string().replace(' ', "");
-    if let Some(len) = parse_f32_array(&type_str) {
+    let inner_str = parse_option_inner(&type_str).unwrap_or(&type_str);
+
+    if let Some(len) = parse_f32_array(inner_str) {
+        if is_optional {
+            return quote! {
+                #field_name_str => {
+                    if value.is_none() {
+                        self.#field_name = ::core::option::Option::None;
+                        return true;
+                    }
+                    match value.as_f32_array() {
+                        ::core::option::Option::Some(arr) if arr.len() == #len => {
+                            let mut buf = [0.0f32; #len];
+                            buf.copy_from_slice(arr);
+                            self.#field_name = ::core::option::Option::Some(buf);
+                            true
+                        }
+                        _ => false,
+                    }
+                }
+            };
+        }
         return quote! {
             #field_name_str => {
                 match value.as_f32_array() {
@@ -574,19 +750,35 @@ fn gen_set_param(
             }
         };
     }
-    let extract = match type_str.as_str() {
+
+    let extract = match inner_str {
         "f32" => quote! { value.as_f32() },
         "i32" => quote! { value.as_i32() },
         "u32" => quote! { value.as_u32() },
         "bool" => quote! { value.as_bool() },
         _ => quote! { value.as_str().map(::zennode::__private::ToString::to_string) },
     };
-    let assign = quote! { self.#field_name = v; };
-    quote! {
-        #field_name_str => {
-            match #extract {
-                ::core::option::Option::Some(v) => { #assign true }
-                ::core::option::Option::None => false,
+
+    if is_optional {
+        quote! {
+            #field_name_str => {
+                if value.is_none() {
+                    self.#field_name = ::core::option::Option::None;
+                    return true;
+                }
+                match #extract {
+                    ::core::option::Option::Some(v) => { self.#field_name = ::core::option::Option::Some(v); true }
+                    ::core::option::Option::None => false,
+                }
+            }
+        }
+    } else {
+        quote! {
+            #field_name_str => {
+                match #extract {
+                    ::core::option::Option::Some(v) => { self.#field_name = v; true }
+                    ::core::option::Option::None => false,
+                }
             }
         }
     }
