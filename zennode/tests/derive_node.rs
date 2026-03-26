@@ -648,3 +648,164 @@ fn non_optional_params_not_marked_optional() {
         assert!(!p.optional, "param {} should not be optional", p.name);
     }
 }
+
+// ─── Json param tests ───
+
+/// A nested struct used as a Json param (like imageflow's ResampleHints).
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug, Default, PartialEq)]
+pub struct Hints {
+    pub down_filter: Option<String>,
+    pub up_filter: Option<String>,
+    pub sharpen_percent: Option<f32>,
+}
+
+/// A tagged union (like imageflow's ConstraintGravity).
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum Gravity {
+    Center,
+    Percentage { x: f32, y: f32 },
+}
+
+impl Default for Gravity {
+    fn default() -> Self {
+        Self::Center
+    }
+}
+
+/// Node with Json params for testing nested/complex types.
+#[derive(Node, Clone, Debug, Default)]
+#[node(id = "test.json_node", group = Geometry, role = Geometry)]
+pub struct JsonNode {
+    /// Target width.
+    #[param(range(0..=65535), default = 0)]
+    #[kv("w")]
+    pub w: Option<u32>,
+
+    /// Resample hints (nested object).
+    #[param(
+        json_schema = r#"{"type":"object","properties":{"down_filter":{"type":"string"},"up_filter":{"type":"string"},"sharpen_percent":{"type":"number"}}}"#
+    )]
+    pub hints: Option<Hints>,
+
+    /// Gravity (tagged union).
+    #[param(
+        json_schema = r#"{"oneOf":[{"const":"center"},{"type":"object","properties":{"percentage":{"type":"object","properties":{"x":{"type":"number"},"y":{"type":"number"}},"required":["x","y"]}}}]}"#
+    )]
+    pub gravity: Option<Gravity>,
+}
+
+#[test]
+fn json_param_schema() {
+    let schema = JSON_NODE_NODE.schema();
+    assert_eq!(schema.id, "test.json_node");
+    assert_eq!(schema.params.len(), 3);
+
+    // w is a normal optional u32
+    assert!(matches!(schema.params[0].kind, ParamKind::U32 { .. }));
+    assert!(schema.params[0].optional);
+
+    // hints is a Json param
+    assert!(matches!(schema.params[1].kind, ParamKind::Json { .. }));
+    assert!(schema.params[1].optional);
+
+    // gravity is a Json param
+    assert!(matches!(schema.params[2].kind, ParamKind::Json { .. }));
+    assert!(schema.params[2].optional);
+}
+
+#[test]
+fn json_param_defaults_are_none() {
+    let node = JSON_NODE_NODE.create_default().unwrap();
+    assert_eq!(node.get_param("w"), Some(ParamValue::None));
+    assert_eq!(node.get_param("hints"), Some(ParamValue::None));
+    assert_eq!(node.get_param("gravity"), Some(ParamValue::None));
+}
+
+#[test]
+fn json_param_round_trip() {
+    let original = JsonNode {
+        w: Some(800),
+        hints: Some(Hints {
+            down_filter: Some("lanczos".into()),
+            up_filter: None,
+            sharpen_percent: Some(15.0),
+        }),
+        gravity: Some(Gravity::Percentage { x: 0.33, y: 0.0 }),
+    };
+
+    let params = original.to_params();
+
+    // w is normal
+    assert_eq!(params.get("w"), Some(&ParamValue::U32(800)));
+
+    // hints is JSON text
+    let hints_json = params.get("hints").unwrap().as_json_str().unwrap();
+    let hints_parsed: Hints = serde_json::from_str(hints_json).unwrap();
+    assert_eq!(hints_parsed.down_filter.as_deref(), Some("lanczos"));
+    assert_eq!(hints_parsed.sharpen_percent, Some(15.0));
+
+    // gravity is JSON text
+    let gravity_json = params.get("gravity").unwrap().as_json_str().unwrap();
+    let gravity_parsed: Gravity = serde_json::from_str(gravity_json).unwrap();
+    assert_eq!(gravity_parsed, Gravity::Percentage { x: 0.33, y: 0.0 });
+
+    // Round-trip through create
+    let node = JSON_NODE_NODE.create(&params).unwrap();
+    let restored = node.as_any().downcast_ref::<JsonNode>().unwrap();
+    assert_eq!(restored.w, Some(800));
+    assert_eq!(
+        restored.hints.as_ref().unwrap().down_filter.as_deref(),
+        Some("lanczos")
+    );
+    assert_eq!(
+        restored.gravity,
+        Some(Gravity::Percentage { x: 0.33, y: 0.0 })
+    );
+}
+
+#[test]
+fn json_param_set_and_clear() {
+    let mut node = JsonNode::default();
+    let boxed: &mut dyn NodeInstance = &mut node;
+
+    // Set hints via JSON text
+    let hints_json = r#"{"down_filter":"ginseng","sharpen_percent":10.0}"#;
+    assert!(boxed.set_param("hints", ParamValue::Json(hints_json.into())));
+    assert!(node.hints.is_some());
+    assert_eq!(
+        node.hints.as_ref().unwrap().down_filter.as_deref(),
+        Some("ginseng")
+    );
+
+    // Clear with None
+    let boxed: &mut dyn NodeInstance = &mut node;
+    assert!(boxed.set_param("hints", ParamValue::None));
+    assert_eq!(node.hints, None);
+}
+
+#[test]
+fn json_param_downcast() {
+    let mut params = ParamMap::new();
+    params.insert("w".into(), ParamValue::U32(1920));
+    params.insert(
+        "gravity".into(),
+        ParamValue::Json(r#"{"percentage":{"x":0.5,"y":0.0}}"#.into()),
+    );
+
+    let node = JSON_NODE_NODE.create(&params).unwrap();
+    let n = node.as_any().downcast_ref::<JsonNode>().unwrap();
+    assert_eq!(n.w, Some(1920));
+    assert_eq!(n.gravity, Some(Gravity::Percentage { x: 0.5, y: 0.0 }));
+    assert_eq!(n.hints, None);
+}
+
+#[test]
+fn json_param_kv_skips_json_fields() {
+    // JSON params don't parse from querystrings — only w matches
+    let mut kv = KvPairs::from_querystring("w=400");
+    let node = JSON_NODE_NODE.from_kv(&mut kv).unwrap().unwrap();
+    assert_eq!(node.get_param("w"), Some(ParamValue::U32(400)));
+    assert_eq!(node.get_param("hints"), Some(ParamValue::None));
+    assert_eq!(node.get_param("gravity"), Some(ParamValue::None));
+}

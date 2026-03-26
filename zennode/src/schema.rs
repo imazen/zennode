@@ -64,7 +64,11 @@ impl NodeSchema {
         if !self.description.is_empty() {
             let _ = write!(md, "{}\n\n", self.description);
         }
-        let _ = write!(md, "**Group:** {:?} | **Role:** {:?}", self.group, self.role);
+        let _ = write!(
+            md,
+            "**Group:** {:?} | **Role:** {:?}",
+            self.group, self.role
+        );
         if !self.tags.is_empty() {
             let _ = write!(md, " | **Tags:** {}", self.tags.join(", "));
         }
@@ -74,40 +78,78 @@ impl NodeSchema {
             md.push_str("|-----------|------|---------|-------|---------|-------------|\n");
             for p in self.params {
                 let (ty, default, range) = match &p.kind {
-                    ParamKind::Float { min, max, default, .. } => {
-                        ("f32", alloc::format!("{default}"), alloc::format!("{min}..{max}"))
-                    }
-                    ParamKind::Int { min, max, default } => {
-                        ("i32", alloc::format!("{default}"), alloc::format!("{min}..{max}"))
-                    }
-                    ParamKind::U32 { min, max, default } => {
-                        ("u32", alloc::format!("{default}"), alloc::format!("{min}..{max}"))
-                    }
-                    ParamKind::Bool { default } => {
-                        ("bool", alloc::format!("{default}"), alloc::string::String::new())
-                    }
-                    ParamKind::Str { default } => {
-                        ("string", alloc::format!("\"{default}\""), alloc::string::String::new())
-                    }
+                    ParamKind::Float {
+                        min, max, default, ..
+                    } => (
+                        "f32",
+                        alloc::format!("{default}"),
+                        alloc::format!("{min}..{max}"),
+                    ),
+                    ParamKind::Int { min, max, default } => (
+                        "i32",
+                        alloc::format!("{default}"),
+                        alloc::format!("{min}..{max}"),
+                    ),
+                    ParamKind::U32 { min, max, default } => (
+                        "u32",
+                        alloc::format!("{default}"),
+                        alloc::format!("{min}..{max}"),
+                    ),
+                    ParamKind::Bool { default } => (
+                        "bool",
+                        alloc::format!("{default}"),
+                        alloc::string::String::new(),
+                    ),
+                    ParamKind::Str { default } => (
+                        "string",
+                        alloc::format!("\"{default}\""),
+                        alloc::string::String::new(),
+                    ),
                     ParamKind::Enum { default, variants } => {
-                        let names: alloc::vec::Vec<&str> = variants.iter().map(|v| v.name).collect();
+                        let names: alloc::vec::Vec<&str> =
+                            variants.iter().map(|v| v.name).collect();
                         ("enum", alloc::format!("\"{default}\""), names.join(" \\| "))
                     }
-                    ParamKind::FloatArray { len, min, max, default, .. } => {
-                        ("f32[]", alloc::format!("[{default}; {len}]"), alloc::format!("{min}..{max}"))
-                    }
-                    ParamKind::Color { default } => {
-                        ("color", alloc::format!("{default:?}"), alloc::string::String::new())
-                    }
+                    ParamKind::FloatArray {
+                        len,
+                        min,
+                        max,
+                        default,
+                        ..
+                    } => (
+                        "f32[]",
+                        alloc::format!("[{default}; {len}]"),
+                        alloc::format!("{min}..{max}"),
+                    ),
+                    ParamKind::Color { default } => (
+                        "color",
+                        alloc::format!("{default:?}"),
+                        alloc::string::String::new(),
+                    ),
+                    ParamKind::Json { .. } => (
+                        "json",
+                        alloc::string::String::from("(complex)"),
+                        alloc::string::String::new(),
+                    ),
                 };
                 let keys = if p.kv_keys.is_empty() {
                     alloc::string::String::from("—")
                 } else {
-                    p.kv_keys.iter().map(|k| alloc::format!("`{k}`")).collect::<alloc::vec::Vec<_>>().join(", ")
+                    p.kv_keys
+                        .iter()
+                        .map(|k| alloc::format!("`{k}`"))
+                        .collect::<alloc::vec::Vec<_>>()
+                        .join(", ")
                 };
                 let _ = write!(
-                    md, "| `{}` | {} | {} | {} | {} | {} |\n",
-                    p.name, ty, default, range, keys, p.description.replace('\n', " "),
+                    md,
+                    "| `{}` | {} | {} | {} | {} | {} |\n",
+                    p.name,
+                    ty,
+                    default,
+                    range,
+                    keys,
+                    p.description.replace('\n', " "),
                 );
             }
             md.push('\n');
@@ -193,6 +235,24 @@ pub enum ParamKind {
     },
     /// RGBA color.
     Color { default: [f32; 4] },
+    /// Opaque JSON structure described by an inline JSON Schema fragment.
+    ///
+    /// For nested objects, tagged unions, or any complex structure that
+    /// doesn't fit the flat parameter model. The field type must implement
+    /// `serde::Serialize + serde::de::DeserializeOwned`.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// #[param(json_schema = r#"{"type":"object","properties":{"x":{"type":"number"}}}"#)]
+    /// pub hints: Option<MyHintsStruct>,
+    /// ```
+    Json {
+        /// JSON Schema 2020-12 fragment as a JSON string.
+        json_schema: &'static str,
+        /// Default value as a JSON string. Empty string means no default.
+        default_json: &'static str,
+    },
 }
 
 /// An enum variant descriptor.

@@ -174,12 +174,18 @@ fn derive_node_inner(input: &DeriveInput) -> syn::Result<TokenStream2> {
                 field_type,
                 id,
                 is_optional,
+                fk.value_variant,
             ));
         }
 
         // is_identity check
         if let Some(id_expr) = &fk.identity_expr {
-            identity_checks.push(gen_identity_check(field_name, field_type, id_expr, is_optional));
+            identity_checks.push(gen_identity_check(
+                field_name,
+                field_type,
+                id_expr,
+                is_optional,
+            ));
         }
     }
 
@@ -378,10 +384,7 @@ fn field_param_kind(
 }
 
 /// Inner helper that works on a type string (for recursion from Option<T>).
-fn field_param_kind_str(
-    type_str: &str,
-    attrs: &ParamAttrs,
-) -> syn::Result<FieldKindResult> {
+fn field_param_kind_str(type_str: &str, attrs: &ParamAttrs) -> syn::Result<FieldKindResult> {
     // Check for [f32; N] array type before the scalar match
     if let Some(len) = parse_f32_array(type_str) {
         let min = attrs
@@ -552,6 +555,29 @@ fn field_param_kind_str(
             })
         }
         _ => {
+            // Check if this is a JSON param (has json_schema attribute)
+            if let Some(ref schema_str) = attrs.json_schema {
+                let default_str = attrs
+                    .json_default
+                    .as_ref()
+                    .map(|d| quote!(#d))
+                    .unwrap_or(quote!(""));
+                let kind = quote! {
+                    ::zennode::ParamKind::Json {
+                        json_schema: #schema_str,
+                        default_json: #default_str,
+                    }
+                };
+                let default_expr = quote! { ::core::default::Default::default() };
+                return Ok(FieldKindResult {
+                    kind_tokens: kind,
+                    value_variant: "Json",
+                    default_expr,
+                    identity_expr: None,
+                    is_optional: false,
+                });
+            }
+
             // Unknown type: treat as string
             let default_lit = attrs
                 .default
@@ -579,9 +605,34 @@ fn gen_to_params(
     field_name: &syn::Ident,
     field_name_str: &str,
     field_type: &syn::Type,
-    _variant: &str,
+    variant: &str,
     is_optional: bool,
 ) -> TokenStream2 {
+    // Json params: serialize field to JSON text via serde_json
+    if variant == "Json" {
+        if is_optional {
+            return quote! {
+                __map.insert(
+                    ::zennode::__private::String::from(#field_name_str),
+                    match &self.#field_name {
+                        ::core::option::Option::Some(__v) => ::zennode::ParamValue::Json(
+                            ::zennode::__private::serde_json::to_string(__v).unwrap_or_default()
+                        ),
+                        ::core::option::Option::None => ::zennode::ParamValue::None,
+                    },
+                );
+            };
+        }
+        return quote! {
+            __map.insert(
+                ::zennode::__private::String::from(#field_name_str),
+                ::zennode::ParamValue::Json(
+                    ::zennode::__private::serde_json::to_string(&self.#field_name).unwrap_or_default()
+                ),
+            );
+        };
+    }
+
     let type_str = quote!(#field_type).to_string().replace(' ', "");
     let inner_str = parse_option_inner(&type_str).unwrap_or(&type_str);
 
@@ -650,9 +701,30 @@ fn gen_get_param(
     field_name: &syn::Ident,
     field_name_str: &str,
     field_type: &syn::Type,
-    _variant: &str,
+    variant: &str,
     is_optional: bool,
 ) -> TokenStream2 {
+    // Json params: serialize field to JSON text
+    if variant == "Json" {
+        if is_optional {
+            return quote! {
+                #field_name_str => ::core::option::Option::Some(match &self.#field_name {
+                    ::core::option::Option::Some(__v) => ::zennode::ParamValue::Json(
+                        ::zennode::__private::serde_json::to_string(__v).unwrap_or_default()
+                    ),
+                    ::core::option::Option::None => ::zennode::ParamValue::None,
+                }),
+            };
+        }
+        return quote! {
+            #field_name_str => ::core::option::Option::Some(
+                ::zennode::ParamValue::Json(
+                    ::zennode::__private::serde_json::to_string(&self.#field_name).unwrap_or_default()
+                )
+            ),
+        };
+    }
+
     let type_str = quote!(#field_type).to_string().replace(' ', "");
     let inner_str = parse_option_inner(&type_str).unwrap_or(&type_str);
 
@@ -712,9 +784,57 @@ fn gen_set_param(
     field_name: &syn::Ident,
     field_name_str: &str,
     field_type: &syn::Type,
-    _variant: &str,
+    variant: &str,
     is_optional: bool,
 ) -> TokenStream2 {
+    // Json params: deserialize from JSON text
+    if variant == "Json" {
+        if is_optional {
+            // Inner type is the field type with Option stripped
+            // We parse the type token stream to get the inner type for from_str
+            let type_str = quote!(#field_type).to_string().replace(' ', "");
+            let inner_type_str = parse_option_inner(&type_str).unwrap_or(&type_str);
+            let inner_type: syn::Type =
+                syn::parse_str(inner_type_str).expect("valid inner type for Option<Json>");
+            return quote! {
+                #field_name_str => {
+                    if value.is_none() {
+                        self.#field_name = ::core::option::Option::None;
+                        return true;
+                    }
+                    match value.as_json_str() {
+                        ::core::option::Option::Some(json) => {
+                            match ::zennode::__private::serde_json::from_str::<#inner_type>(json) {
+                                ::core::result::Result::Ok(v) => {
+                                    self.#field_name = ::core::option::Option::Some(v);
+                                    true
+                                }
+                                ::core::result::Result::Err(_) => false,
+                            }
+                        }
+                        ::core::option::Option::None => false,
+                    }
+                }
+            };
+        }
+        return quote! {
+            #field_name_str => {
+                match value.as_json_str() {
+                    ::core::option::Option::Some(json) => {
+                        match ::zennode::__private::serde_json::from_str(json) {
+                            ::core::result::Result::Ok(v) => {
+                                self.#field_name = v;
+                                true
+                            }
+                            ::core::result::Result::Err(_) => false,
+                        }
+                    }
+                    ::core::option::Option::None => false,
+                }
+            }
+        };
+    }
+
     let type_str = quote!(#field_type).to_string().replace(' ', "");
     let inner_str = parse_option_inner(&type_str).unwrap_or(&type_str);
 
@@ -790,7 +910,13 @@ fn gen_from_kv(
     field_type: &syn::Type,
     node_id: &syn::LitStr,
     is_optional: bool,
+    variant: &str,
 ) -> TokenStream2 {
+    // Json params don't come from querystrings — skip
+    if variant == "Json" {
+        return quote! {};
+    }
+
     let type_str = quote!(#field_type).to_string().replace(' ', "");
     let inner_str = parse_option_inner(&type_str).unwrap_or(&type_str);
 
@@ -855,7 +981,9 @@ fn gen_identity_check(
 
     if is_optional {
         match inner_str {
-            "f32" => quote! { self.#field_name.map_or(true, |v| (v - #identity_expr).abs() < 1e-6) },
+            "f32" => {
+                quote! { self.#field_name.map_or(true, |v| (v - #identity_expr).abs() < 1e-6) }
+            }
             _ => quote! { self.#field_name.as_ref().map_or(true, |v| *v == #identity_expr) },
         }
     } else {

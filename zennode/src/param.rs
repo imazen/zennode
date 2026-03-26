@@ -29,6 +29,15 @@ pub enum ParamValue {
     F32Array(Vec<f32>),
     /// RGBA color.
     Color([f32; 4]),
+    /// Opaque JSON value, stored as a JSON text string.
+    ///
+    /// Carries nested objects, tagged unions, or any complex structure
+    /// whose wire format is a JSON object/array. The schema describes
+    /// the structure via an embedded JSON Schema fragment.
+    ///
+    /// Use `as_json_str()` to get the raw JSON text, or deserialize
+    /// with `serde_json::from_str` to a concrete type.
+    Json(String),
 }
 
 impl ParamValue {
@@ -100,6 +109,14 @@ impl ParamValue {
     pub fn as_color(&self) -> Option<[f32; 4]> {
         match self {
             Self::Color(v) => Some(*v),
+            _ => None,
+        }
+    }
+
+    /// Try to extract as a JSON text string reference.
+    pub fn as_json_str(&self) -> Option<&str> {
+        match self {
+            Self::Json(v) => Some(v),
             _ => None,
         }
     }

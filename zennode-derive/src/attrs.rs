@@ -113,6 +113,10 @@ pub struct ParamAttrs {
     pub labels: Vec<LitStr>,
     pub visible_when: Option<LitStr>,
     pub color: bool,
+    /// Raw JSON Schema string for `ParamKind::Json` params.
+    pub json_schema: Option<LitStr>,
+    /// Raw JSON default value string.
+    pub json_default: Option<LitStr>,
     pub kv_keys: Vec<LitStr>,
 }
 
@@ -170,6 +174,12 @@ impl ParamAttrs {
                         result.visible_when = Some(meta.input.parse::<LitStr>()?);
                     } else if meta.path.is_ident("color") {
                         result.color = true;
+                    } else if meta.path.is_ident("json_schema") {
+                        meta.input.parse::<Token![=]>()?;
+                        result.json_schema = Some(meta.input.parse::<LitStr>()?);
+                    } else if meta.path.is_ident("json_default") {
+                        meta.input.parse::<Token![=]>()?;
+                        result.json_default = Some(meta.input.parse::<LitStr>()?);
                     } else {
                         return Err(meta.error("unknown param attribute"));
                     }

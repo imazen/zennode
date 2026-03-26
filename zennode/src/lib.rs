@@ -80,4 +80,7 @@ pub mod __private {
     pub use alloc::boxed::Box;
     pub use alloc::string::{String, ToString};
     pub use alloc::vec::Vec;
+
+    #[cfg(feature = "serde")]
+    pub use serde_json;
 }

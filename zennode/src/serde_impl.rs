@@ -23,6 +23,12 @@ impl Serialize for ParamValue {
             Self::Str(v) | Self::Enum(v) => serializer.serialize_str(v),
             Self::F32Array(v) => v.serialize(serializer),
             Self::Color(v) => v.serialize(serializer),
+            Self::Json(v) => {
+                // Parse JSON text and serialize the parsed value
+                let parsed: serde_json::Value =
+                    serde_json::from_str(v).unwrap_or(serde_json::Value::Null);
+                parsed.serialize(serializer)
+            }
         }
     }
 }
@@ -61,6 +67,7 @@ fn json_to_param_value(value: &serde_json::Value) -> ParamValue {
                 ParamValue::F32Array(floats)
             }
         }
+        serde_json::Value::Object(_) => ParamValue::Json(value.to_string()),
         _ => ParamValue::Str(alloc::string::String::new()),
     }
 }
@@ -232,6 +239,20 @@ impl Serialize for ParamKind {
             Self::Color { default } => {
                 map.serialize_entry("type", "color")?;
                 map.serialize_entry("default", default)?;
+            }
+            Self::Json {
+                json_schema,
+                default_json,
+            } => {
+                map.serialize_entry("type", "json")?;
+                if let Ok(schema_val) = serde_json::from_str::<serde_json::Value>(json_schema) {
+                    map.serialize_entry("schema", &schema_val)?;
+                }
+                if !default_json.is_empty() {
+                    if let Ok(def) = serde_json::from_str::<serde_json::Value>(default_json) {
+                        map.serialize_entry("default", &def)?;
+                    }
+                }
             }
             _ => {
                 map.serialize_entry("type", "unknown")?;

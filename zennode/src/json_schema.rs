@@ -159,6 +159,19 @@ fn param_to_schema(param: &ParamDesc) -> Value {
             "default": default,
             "x-zennode-color": true,
         }),
+        ParamKind::Json {
+            json_schema,
+            default_json,
+        } => {
+            // Parse and embed the JSON Schema fragment directly
+            let mut s = serde_json::from_str::<Value>(json_schema).unwrap_or_else(|_| json!({}));
+            if !default_json.is_empty() {
+                if let Ok(def) = serde_json::from_str::<Value>(default_json) {
+                    s["default"] = def;
+                }
+            }
+            s
+        }
         _ => json!({ "type": "string" }),
     };
 
