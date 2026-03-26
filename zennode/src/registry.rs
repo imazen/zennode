@@ -264,7 +264,11 @@ impl NodeRegistry {
                 crate::schema::ParamKind::Enum { .. } => {
                     value.as_str().map(|s| ParamValue::Str(s.into()))
                 }
-                crate::schema::ParamKind::Json { .. } => Some(ParamValue::Json(value.to_string())),
+                crate::schema::ParamKind::Json { .. }
+                | crate::schema::ParamKind::Object { .. }
+                | crate::schema::ParamKind::TaggedUnion { .. } => {
+                    Some(ParamValue::Json(value.to_string()))
+                }
                 crate::schema::ParamKind::FloatArray { len, .. } => {
                     value.as_array().and_then(|arr| {
                         if arr.len() == *len {

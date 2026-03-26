@@ -247,6 +247,27 @@ pub fn ident_to_label(name: &str) -> String {
     result
 }
 
+/// Extract `#[serde(rename_all = "...")]` value from attributes, if present.
+pub fn extract_serde_rename_all(attrs: &[syn::Attribute]) -> Option<String> {
+    for attr in attrs {
+        if attr.path().is_ident("serde") {
+            let mut result = None;
+            let _ = attr.parse_nested_meta(|meta| {
+                if meta.path.is_ident("rename_all") {
+                    meta.input.parse::<Token![=]>()?;
+                    let lit: LitStr = meta.input.parse()?;
+                    result = Some(lit.value());
+                }
+                Ok(())
+            });
+            if result.is_some() {
+                return result;
+            }
+        }
+    }
+    None
+}
+
 /// Convert a snake_case field name to a title-cased label.
 /// e.g., "noise_floor" -> "Noise Floor"
 pub fn snake_to_label(name: &str) -> String {

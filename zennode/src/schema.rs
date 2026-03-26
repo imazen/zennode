@@ -152,6 +152,15 @@ impl NodeSchema {
                         alloc::string::String::from("(complex)"),
                         alloc::string::String::new(),
                     ),
+                    ParamKind::Object { params } => (
+                        "object",
+                        alloc::format!("{} fields", params.len()),
+                        alloc::string::String::new(),
+                    ),
+                    ParamKind::TaggedUnion { variants } => {
+                        let tags: alloc::vec::Vec<&str> = variants.iter().map(|v| v.tag).collect();
+                        ("union", tags.join(" \\| "), alloc::string::String::new())
+                    }
                 };
                 let keys = if p.kv_keys.is_empty() {
                     alloc::string::String::from("—")
@@ -180,6 +189,7 @@ impl NodeSchema {
 }
 
 /// A single parameter descriptor.
+#[derive(Clone, Debug, PartialEq)]
 pub struct ParamDesc {
     /// Machine name — matches the Rust struct field name.
     pub name: &'static str,
@@ -289,9 +299,8 @@ pub enum ParamKind {
     Color { default: [f32; 4] },
     /// Opaque JSON structure described by an inline JSON Schema fragment.
     ///
-    /// For nested objects, tagged unions, or any complex structure that
-    /// doesn't fit the flat parameter model. The field type must implement
-    /// `serde::Serialize + serde::de::DeserializeOwned`.
+    /// For types that don't derive `Node` but need JSON param support.
+    /// Prefer `Object` or `TaggedUnion` for types that derive `Node`.
     ///
     /// # Example
     ///
@@ -304,6 +313,23 @@ pub enum ParamKind {
         json_schema: &'static str,
         /// Default value as a JSON string. Empty string means no default.
         default_json: &'static str,
+    },
+    /// Nested object with discoverable sub-parameters.
+    ///
+    /// The field type must implement [`NodeParams`]. Auto-detected by
+    /// `#[derive(Node)]` when a field's type also derives `Node`.
+    /// UIs render this as a collapsible sub-group with individual controls.
+    Object {
+        /// Sub-field descriptors with full UX metadata.
+        params: &'static [ParamDesc],
+    },
+    /// Tagged union (discriminated enum) with variant-specific parameters.
+    ///
+    /// The field type must implement [`NodeParams`]. UIs render this as
+    /// a variant selector (dropdown) plus variant-specific params.
+    TaggedUnion {
+        /// Variant descriptors. Unit variants have empty `params`.
+        variants: &'static [TaggedVariant],
     },
 }
 
@@ -318,32 +344,52 @@ pub struct EnumVariant {
     pub description: &'static str,
 }
 
-/// Trait for types that provide a JSON Schema fragment.
+/// Trait for types usable as structured node parameters.
 ///
-/// Auto-implemented by `#[derive(Node)]` on structs (with or without `#[node(id)]`)
-/// and on enums. For structs with `#[node(id)]`, both `JsonParam` and the full
-/// `NodeDef`/`NodeInstance` impls are generated. For structs without `#[node(id)]`,
-/// only `JsonParam` is generated.
+/// Auto-implemented by `#[derive(Node)]`:
+/// - **Structs with `#[node(id)]`**: full Node + `NodeParams` (sub-fields discoverable)
+/// - **Structs without `#[node(id)]`**: `NodeParams` only (sub-struct for nesting)
+/// - **Enums**: `NodeParams` with tagged variant descriptors
 ///
-/// For enums, `#[derive(Node)]` generates a `oneOf` JSON Schema supporting
-/// unit variants and struct variants, following serde's externally-tagged format.
+/// Used by `ParamKind::Object` and `ParamKind::TaggedUnion` to provide
+/// full UX metadata (ranges, labels, sliders) for nested parameters.
 ///
 /// # Example
 ///
 /// ```rust,ignore
-/// // Sub-struct (no node id) — only JsonParam is generated
+/// // Sub-struct (no node id) — only NodeParams is generated
 /// #[derive(Node, Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
 /// pub struct MyHints {
 ///     pub down_filter: Option<String>,
 ///     #[param(range(0.0..=100.0))]
 ///     pub sharpen_percent: Option<f32>,
 /// }
-///
-/// assert!(!MyHints::JSON_SCHEMA.is_empty());
 /// ```
-pub trait JsonParam {
-    /// JSON Schema 2020-12 fragment as a static string.
-    const JSON_SCHEMA: &'static str;
+pub trait NodeParams {
+    /// The `ParamKind` for this type when used as a field in another node.
+    ///
+    /// For structs: `ParamKind::Object { params }`.
+    /// For enums: `ParamKind::TaggedUnion { variants }`.
+    const PARAM_KIND: ParamKind;
+}
+
+// Keep JsonParam as an alias for backwards compat with the Json param codegen
+pub use NodeParams as JsonParam;
+
+/// A variant in a tagged union parameter.
+///
+/// Describes one arm of an enum used as a node parameter.
+/// Unit variants have an empty `params` slice.
+#[derive(Clone, Debug, PartialEq)]
+pub struct TaggedVariant {
+    /// Machine name (snake_case, matching serde serialization).
+    pub tag: &'static str,
+    /// Human-readable label.
+    pub label: &'static str,
+    /// Short description from doc comments.
+    pub description: &'static str,
+    /// Parameters for this variant (empty for unit variants).
+    pub params: &'static [ParamDesc],
 }
 
 /// How a parameter maps to a UI slider.

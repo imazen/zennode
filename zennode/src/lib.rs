@@ -67,7 +67,8 @@ pub type Phase = NodeRole;
 pub use param::{ParamMap, ParamValue};
 pub use registry::{KvResult, NodeRegistry};
 pub use schema::{
-    EnumVariant, JsonParam, NodeGroup, NodeSchema, ParamDesc, ParamKind, SliderMapping,
+    EnumVariant, JsonParam, NodeGroup, NodeParams, NodeSchema, ParamDesc, ParamKind, SliderMapping,
+    TaggedVariant,
 };
 pub use traits::{NodeDef, NodeInstance};
 pub use version::VersionSet;
@@ -83,7 +84,7 @@ pub mod __private {
     pub use alloc::string::{String, ToString};
     pub use alloc::vec::Vec;
 
-    pub use crate::schema::JsonParam;
+    pub use crate::schema::{NodeParams, ParamDesc, ParamKind, TaggedVariant};
 
     #[cfg(feature = "serde")]
     pub use serde_json;

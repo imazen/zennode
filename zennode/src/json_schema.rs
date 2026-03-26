@@ -172,6 +172,56 @@ fn param_to_schema(param: &ParamDesc) -> Value {
             }
             s
         }
+        ParamKind::Object { params } => {
+            let mut properties = serde_json::Map::new();
+            for sub_param in *params {
+                properties.insert(
+                    sub_param.effective_json_name().into(),
+                    param_to_schema(sub_param),
+                );
+            }
+            json!({
+                "type": "object",
+                "properties": properties,
+            })
+        }
+        ParamKind::TaggedUnion { variants } => {
+            // Externally-tagged serde format: {"variant_name": {...fields...}} or "variant_name"
+            let one_of: std::vec::Vec<Value> = variants
+                .iter()
+                .map(|v| {
+                    if v.params.is_empty() {
+                        // Unit variant: just the tag string
+                        json!({ "const": v.tag })
+                    } else {
+                        // Struct variant: {"tag": {"field": type, ...}}
+                        let mut inner_props = serde_json::Map::new();
+                        for p in v.params {
+                            inner_props.insert(p.effective_json_name().into(), param_to_schema(p));
+                        }
+                        let required: std::vec::Vec<&str> = v
+                            .params
+                            .iter()
+                            .filter(|p| !p.optional)
+                            .map(|p| p.effective_json_name())
+                            .collect();
+                        let mut inner = json!({
+                            "type": "object",
+                            "properties": inner_props,
+                        });
+                        if !required.is_empty() {
+                            inner["required"] = json!(required);
+                        }
+                        json!({
+                            "type": "object",
+                            "properties": { v.tag: inner },
+                            "required": [v.tag],
+                        })
+                    }
+                })
+                .collect();
+            json!({ "oneOf": one_of })
+        }
         _ => json!({ "type": "string" }),
     };
 

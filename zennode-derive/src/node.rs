@@ -3,7 +3,7 @@
 use proc_macro::TokenStream;
 use proc_macro2::{Span, TokenStream as TokenStream2};
 use quote::{format_ident, quote};
-use syn::{Data, DeriveInput, Fields};
+use syn::{Data, DataEnum, DeriveInput, Fields};
 
 use crate::attrs::{self, NodeAttrs, ParamAttrs};
 use crate::codegen;
@@ -19,21 +19,40 @@ pub fn derive_node_impl(input: TokenStream) -> TokenStream {
 fn derive_node_inner(input: &DeriveInput) -> syn::Result<TokenStream2> {
     let node_attrs = NodeAttrs::from_ast(&input.attrs)?;
 
-    // Validate required attributes
-    let id = node_attrs
-        .id
-        .as_ref()
-        .ok_or_else(|| syn::Error::new(Span::call_site(), "missing #[node(id = \"...\")]"))?;
-    let group = node_attrs
-        .group
-        .as_ref()
-        .ok_or_else(|| syn::Error::new(Span::call_site(), "missing #[node(group = ...)]"))?;
-    let role = node_attrs.role.as_ref().ok_or_else(|| {
-        syn::Error::new(
-            Span::call_site(),
-            "missing #[node(role = ...)] (or legacy #[node(phase = ...)])",
-        )
-    })?;
+    // Dispatch: enum → tagged union, struct → node or sub-struct
+    match &input.data {
+        Data::Enum(data) => return derive_enum_node_params(input, &node_attrs, data),
+        Data::Struct(_) => {} // handled below
+        _ => {
+            return Err(syn::Error::new(
+                Span::call_site(),
+                "Node can only be derived on structs and enums",
+            ));
+        }
+    }
+
+    // Struct path: check if this is a full Node (has id) or a sub-struct (no id)
+    let is_full_node = node_attrs.id.is_some();
+
+    if is_full_node {
+        // Validate required attributes for full nodes
+        if node_attrs.group.is_none() {
+            return Err(syn::Error::new(
+                Span::call_site(),
+                "missing #[node(group = ...)]",
+            ));
+        }
+        if node_attrs.role.is_none() {
+            return Err(syn::Error::new(
+                Span::call_site(),
+                "missing #[node(role = ...)] (or legacy #[node(phase = ...)])",
+            ));
+        }
+    }
+
+    let id = node_attrs.id.as_ref();
+    let group = node_attrs.group.as_ref();
+    let role = node_attrs.role.as_ref();
 
     let struct_name = &input.ident;
     let struct_doc = attrs::extract_doc_comment(&input.attrs);
@@ -63,12 +82,7 @@ fn derive_node_inner(input: &DeriveInput) -> syn::Result<TokenStream2> {
                 ));
             }
         },
-        _ => {
-            return Err(syn::Error::new(
-                Span::call_site(),
-                "Node can only be derived on structs",
-            ));
-        }
+        _ => unreachable!("enum case handled above"),
     };
 
     // Parse field attributes and generate param descriptors
@@ -186,16 +200,18 @@ fn derive_node_inner(input: &DeriveInput) -> syn::Result<TokenStream2> {
         // Default initializer
         default_init_tokens.push(quote! { #field_name: #default_expr });
 
-        // from_kv
+        // from_kv (only for full nodes that have an id)
         if !param_attrs.kv_keys.is_empty() {
-            from_kv_tokens.push(gen_from_kv(
-                field_name,
-                &param_attrs.kv_keys,
-                field_type,
-                id,
-                is_optional,
-                fk.value_variant,
-            ));
+            if let Some(id_lit) = id {
+                from_kv_tokens.push(gen_from_kv(
+                    field_name,
+                    &param_attrs.kv_keys,
+                    field_type,
+                    id_lit,
+                    is_optional,
+                    fk.value_variant,
+                ));
+            }
         }
 
         // is_identity check
@@ -243,6 +259,30 @@ fn derive_node_inner(input: &DeriveInput) -> syn::Result<TokenStream2> {
     let def_struct = format_ident!("{}NodeDef", struct_name);
     let def_static = format_ident!("{}_NODE", to_screaming_snake(&struct_name.to_string()));
 
+    // Always generate NodeParams (for both full nodes and sub-structs)
+    let node_params_impl = quote! {
+        // Static param descriptors
+        static #params_name: [::zennode::__private::ParamDesc; #num_params] = [
+            #(#param_desc_tokens),*
+        ];
+
+        impl ::zennode::__private::NodeParams for #struct_name {
+            const PARAM_KIND: ::zennode::ParamKind = ::zennode::ParamKind::Object {
+                params: &#params_name,
+            };
+        }
+    };
+
+    // For sub-structs (no id): only generate NodeParams, no NodeDef/NodeInstance
+    if !is_full_node {
+        return Ok(node_params_impl);
+    }
+
+    // Full Node: generate everything
+    let id = id.unwrap();
+    let group = group.unwrap();
+    let role = role.unwrap();
+
     let is_identity_body = if identity_checks.is_empty() {
         quote! { false }
     } else {
@@ -261,10 +301,7 @@ fn derive_node_inner(input: &DeriveInput) -> syn::Result<TokenStream2> {
     };
 
     Ok(quote! {
-        // Static param descriptors
-        static #params_name: [::zennode::ParamDesc; #num_params] = [
-            #(#param_desc_tokens),*
-        ];
+        #node_params_impl
 
         // Static schema
         static #schema_name: ::zennode::NodeSchema = ::zennode::NodeSchema {
@@ -351,6 +388,203 @@ fn derive_node_inner(input: &DeriveInput) -> syn::Result<TokenStream2> {
             }
         }
     })
+}
+
+/// Generate `NodeParams` for an enum (tagged union).
+///
+/// Each variant becomes a `TaggedVariant`. Unit variants have empty params.
+/// Struct variants have their fields processed as sub-params.
+fn derive_enum_node_params(
+    input: &DeriveInput,
+    _node_attrs: &NodeAttrs,
+    data: &DataEnum,
+) -> syn::Result<TokenStream2> {
+    let enum_name = &input.ident;
+
+    // Detect #[serde(rename_all = "...")] for variant name conversion
+    let rename_all = attrs::extract_serde_rename_all(&input.attrs);
+
+    let mut variant_tokens = Vec::new();
+    let mut sub_param_statics = Vec::new();
+
+    for variant in &data.variants {
+        let variant_name = &variant.ident;
+        let variant_doc = attrs::extract_doc_comment(&variant.attrs);
+
+        // Apply rename_all to get the serde tag name
+        let tag_name = apply_rename(
+            &to_snake_case(&variant_name.to_string()),
+            rename_all.as_deref(),
+        );
+        let variant_label = attrs::ident_to_label(&variant_name.to_string());
+
+        match &variant.fields {
+            Fields::Unit => {
+                // Unit variant: no params
+                variant_tokens.push(quote! {
+                    ::zennode::__private::TaggedVariant {
+                        tag: #tag_name,
+                        label: #variant_label,
+                        description: #variant_doc,
+                        params: &[],
+                    }
+                });
+            }
+            Fields::Named(fields) => {
+                // Struct variant: process fields as sub-params
+                let sub_params_name = format_ident!(
+                    "__ZENODE_{}_{}_PARAMS",
+                    to_screaming_snake(&enum_name.to_string()),
+                    to_screaming_snake(&variant_name.to_string())
+                );
+                let num_fields = fields.named.len();
+                let mut field_descs = Vec::new();
+
+                for field in &fields.named {
+                    let field_name = field.ident.as_ref().unwrap();
+                    let field_name_str = field_name.to_string();
+                    let field_type = &field.ty;
+                    let param_attrs = ParamAttrs::from_ast(&field.attrs)?;
+                    let field_doc = attrs::extract_doc_comment(&field.attrs);
+
+                    let param_label = match &param_attrs.label {
+                        Some(l) => l.value(),
+                        None => attrs::snake_to_label(&field_name_str),
+                    };
+                    let unit = param_attrs
+                        .unit
+                        .as_ref()
+                        .map(|l| l.value())
+                        .unwrap_or_default();
+                    let section = param_attrs
+                        .section
+                        .as_ref()
+                        .map(|l| l.value())
+                        .unwrap_or_else(|| "Main".to_string());
+                    let since = param_attrs.since.unwrap_or(1);
+                    let visible_when = param_attrs
+                        .visible_when
+                        .as_ref()
+                        .map(|l| l.value())
+                        .unwrap_or_default();
+                    let slider_tokens = match &param_attrs.slider {
+                        Some(s) => quote! { ::zennode::SliderMapping::#s },
+                        None => quote! { ::zennode::SliderMapping::Linear },
+                    };
+                    let json_name_str = param_attrs
+                        .json_name
+                        .as_ref()
+                        .map(|l| l.value())
+                        .unwrap_or_default();
+                    let json_aliases: Vec<_> = param_attrs.json_aliases.iter().collect();
+                    let json_aliases_tokens = if json_aliases.is_empty() {
+                        quote! { &[] }
+                    } else {
+                        quote! { &[#(#json_aliases),*] }
+                    };
+
+                    let fk = field_param_kind(field_type, &param_attrs, &field_name_str)?;
+                    let kind_tokens = &fk.kind_tokens;
+                    let is_optional = fk.is_optional;
+
+                    field_descs.push(quote! {
+                        ::zennode::__private::ParamDesc {
+                            name: #field_name_str,
+                            label: #param_label,
+                            description: #field_doc,
+                            kind: #kind_tokens,
+                            unit: #unit,
+                            section: #section,
+                            slider: #slider_tokens,
+                            kv_keys: &[],
+                            since_version: #since,
+                            visible_when: #visible_when,
+                            optional: #is_optional,
+                            json_name: #json_name_str,
+                            json_aliases: #json_aliases_tokens,
+                        }
+                    });
+                }
+
+                sub_param_statics.push(quote! {
+                    static #sub_params_name: [::zennode::__private::ParamDesc; #num_fields] = [
+                        #(#field_descs),*
+                    ];
+                });
+
+                variant_tokens.push(quote! {
+                    ::zennode::__private::TaggedVariant {
+                        tag: #tag_name,
+                        label: #variant_label,
+                        description: #variant_doc,
+                        params: &#sub_params_name,
+                    }
+                });
+            }
+            Fields::Unnamed(_) => {
+                return Err(syn::Error::new_spanned(
+                    variant_name,
+                    "Node derive on enums only supports unit and named-field variants",
+                ));
+            }
+        }
+    }
+
+    let num_variants = variant_tokens.len();
+    let variants_name = format_ident!(
+        "__ZENODE_{}_VARIANTS",
+        to_screaming_snake(&enum_name.to_string())
+    );
+
+    Ok(quote! {
+        #(#sub_param_statics)*
+
+        static #variants_name: [::zennode::__private::TaggedVariant; #num_variants] = [
+            #(#variant_tokens),*
+        ];
+
+        impl ::zennode::__private::NodeParams for #enum_name {
+            const PARAM_KIND: ::zennode::ParamKind = ::zennode::ParamKind::TaggedUnion {
+                variants: &#variants_name,
+            };
+        }
+    })
+}
+
+/// Convert PascalCase to snake_case.
+fn to_snake_case(name: &str) -> String {
+    let mut result = String::new();
+    for (i, ch) in name.chars().enumerate() {
+        if i > 0 && ch.is_uppercase() {
+            result.push('_');
+        }
+        result.push(ch.to_ascii_lowercase());
+    }
+    result
+}
+
+/// Apply a serde rename_all strategy to a snake_case name.
+fn apply_rename(snake: &str, rename_all: Option<&str>) -> String {
+    match rename_all {
+        Some("snake_case") | None => snake.to_string(),
+        Some("camelCase") => {
+            let mut result = String::new();
+            let mut capitalize_next = false;
+            for ch in snake.chars() {
+                if ch == '_' {
+                    capitalize_next = true;
+                } else if capitalize_next {
+                    result.push(ch.to_ascii_uppercase());
+                    capitalize_next = false;
+                } else {
+                    result.push(ch);
+                }
+            }
+            result
+        }
+        Some("lowercase") => snake.to_ascii_lowercase().replace('_', ""),
+        _ => snake.to_string(),
+    }
 }
 
 /// Try to parse a type string as `[f32;N]` and return `N` if it matches.
@@ -600,21 +834,21 @@ fn field_param_kind_str(type_str: &str, attrs: &ParamAttrs) -> syn::Result<Field
                 });
             }
 
-            // Unknown type: treat as string
-            let default_lit = attrs
-                .default
-                .as_ref()
-                .map(|e| quote!(#e))
-                .unwrap_or(quote!(""));
-            let kind = quote! { ::zennode::ParamKind::Str { default: #default_lit } };
-            let default_expr = attrs
-                .default
-                .as_ref()
-                .map(|e| quote!(::zennode::__private::String::from(#e)))
-                .unwrap_or_else(|| quote!(::zennode::__private::String::new()));
+            // Unknown type: try NodeParams trait for structured sub-types.
+            // The type's PARAM_KIND const tells us if it's Object or TaggedUnion.
+            //
+            // If the type doesn't implement NodeParams, this will be a compile error
+            // pointing at the field — use #[param(json_schema)] for types without
+            // Node derive, or add #[derive(Node)] to the type.
+            let inner_ty: syn::Type = syn::parse_str(type_str)
+                .unwrap_or_else(|_| syn::parse_str::<syn::Type>("()").unwrap());
+            let kind = quote! {
+                <#inner_ty as ::zennode::__private::NodeParams>::PARAM_KIND
+            };
+            let default_expr = quote! { ::core::default::Default::default() };
             Ok(FieldKindResult {
                 kind_tokens: kind,
-                value_variant: "Str",
+                value_variant: "Json",
                 default_expr,
                 identity_expr: None,
                 is_optional: false,

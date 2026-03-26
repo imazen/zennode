@@ -1152,3 +1152,175 @@ fn node_from_json_missing_key_error() {
 
     assert!(registry.node_from_json(&json).err().is_some());
 }
+
+// ─── Sub-struct and enum NodeParams tests ───
+
+/// Sub-struct: derives Node WITHOUT #[node(id)] → only NodeParams generated.
+#[derive(Node, Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct SubHints {
+    /// Downscale filter name.
+    pub down_filter: Option<String>,
+
+    /// Sharpening amount.
+    #[param(range(0.0..=100.0), default = 0.0, step = 1.0)]
+    #[param(unit = "%")]
+    pub sharpen_percent: Option<f32>,
+}
+
+/// Tagged enum: derives Node → NodeParams with TaggedVariant descriptors.
+#[derive(Node, Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SubGravity {
+    /// Center of the image.
+    Center,
+    /// Percentage-based position.
+    Percentage {
+        /// Horizontal position (0.0 = left, 1.0 = right).
+        #[param(range(0.0..=1.0), default = 0.5, step = 0.01)]
+        x: f32,
+        /// Vertical position (0.0 = top, 1.0 = bottom).
+        #[param(range(0.0..=1.0), default = 0.5, step = 0.01)]
+        y: f32,
+    },
+}
+
+impl Default for SubGravity {
+    fn default() -> Self {
+        Self::Center
+    }
+}
+
+/// Full node using sub-struct and enum fields.
+#[derive(Node, Clone, Debug, Default)]
+#[node(id = "test.recursive_node", group = Layout, role = Resize)]
+#[node(json_key = "recursive")]
+pub struct RecursiveNode {
+    pub w: Option<u32>,
+    pub hints: Option<SubHints>,
+    pub gravity: Option<SubGravity>,
+}
+
+#[test]
+fn sub_struct_node_params() {
+    // SubHints should implement NodeParams
+    let kind = SubHints::PARAM_KIND;
+    match &kind {
+        ParamKind::Object { params } => {
+            assert_eq!(params.len(), 2);
+            assert_eq!(params[0].name, "down_filter");
+            assert!(params[0].optional);
+            assert_eq!(params[1].name, "sharpen_percent");
+            assert!(params[1].optional);
+            // Check range on sharpen_percent
+            match &params[1].kind {
+                ParamKind::Float { min, max, .. } => {
+                    assert_eq!(*min, 0.0);
+                    assert_eq!(*max, 100.0);
+                }
+                other => panic!("expected Float, got {:?}", other),
+            }
+        }
+        other => panic!("expected Object, got {:?}", other),
+    }
+}
+
+#[test]
+fn enum_node_params() {
+    // SubGravity should implement NodeParams with TaggedUnion
+    let kind = SubGravity::PARAM_KIND;
+    match &kind {
+        ParamKind::TaggedUnion { variants } => {
+            assert_eq!(variants.len(), 2);
+
+            // Unit variant: center
+            assert_eq!(variants[0].tag, "center");
+            assert_eq!(variants[0].label, "Center");
+            assert!(variants[0].params.is_empty());
+
+            // Struct variant: percentage with x, y
+            assert_eq!(variants[1].tag, "percentage");
+            assert_eq!(variants[1].label, "Percentage");
+            assert_eq!(variants[1].params.len(), 2);
+            assert_eq!(variants[1].params[0].name, "x");
+            assert_eq!(variants[1].params[1].name, "y");
+            // Check range on x
+            match &variants[1].params[0].kind {
+                ParamKind::Float { min, max, .. } => {
+                    assert_eq!(*min, 0.0);
+                    assert_eq!(*max, 1.0);
+                }
+                other => panic!("expected Float for x, got {:?}", other),
+            }
+        }
+        other => panic!("expected TaggedUnion, got {:?}", other),
+    }
+}
+
+#[test]
+fn recursive_node_schema_has_object_and_tagged_union_params() {
+    let schema = RECURSIVE_NODE_NODE.schema();
+    assert_eq!(schema.id, "test.recursive_node");
+    assert_eq!(schema.params.len(), 3);
+
+    // w: normal optional u32
+    assert!(matches!(schema.params[0].kind, ParamKind::U32 { .. }));
+    assert!(schema.params[0].optional);
+
+    // hints: Object (sub-struct)
+    match &schema.params[1].kind {
+        ParamKind::Object { params } => {
+            assert_eq!(params.len(), 2);
+            assert_eq!(params[0].name, "down_filter");
+        }
+        other => panic!("expected Object for hints, got {:?}", other),
+    }
+    assert!(schema.params[1].optional);
+
+    // gravity: TaggedUnion (enum)
+    match &schema.params[2].kind {
+        ParamKind::TaggedUnion { variants } => {
+            assert_eq!(variants.len(), 2);
+            assert_eq!(variants[0].tag, "center");
+            assert_eq!(variants[1].tag, "percentage");
+        }
+        other => panic!("expected TaggedUnion for gravity, got {:?}", other),
+    }
+    assert!(schema.params[2].optional);
+}
+
+#[test]
+fn recursive_node_json_round_trip() {
+    let mut registry = NodeRegistry::new();
+    registry.register(&RECURSIVE_NODE_NODE);
+
+    let json: serde_json::Value = serde_json::json!({
+        "recursive": {
+            "w": 800,
+            "hints": {"down_filter": "lanczos", "sharpen_percent": 15.0},
+            "gravity": {"percentage": {"x": 0.33, "y": 0.0}}
+        }
+    });
+
+    let node = registry.node_from_json(&json).unwrap();
+    let r = node.as_any().downcast_ref::<RecursiveNode>().unwrap();
+    assert_eq!(r.w, Some(800));
+
+    // Check hints round-trip
+    let hints = r.hints.as_ref().unwrap();
+    assert_eq!(hints.down_filter.as_deref(), Some("lanczos"));
+    assert_eq!(hints.sharpen_percent, Some(15.0));
+
+    // Check gravity round-trip
+    assert_eq!(r.gravity, Some(SubGravity::Percentage { x: 0.33, y: 0.0 }));
+
+    // Serialize back and verify structure
+    let out = registry.node_to_json(node.as_ref());
+    let inner = out.get("recursive").unwrap();
+    assert_eq!(inner.get("w").unwrap(), 800);
+    // hints should be a nested object (not string-escaped)
+    assert!(inner.get("hints").unwrap().is_object());
+    assert_eq!(
+        inner.get("hints").unwrap().get("down_filter").unwrap(),
+        "lanczos"
+    );
+}

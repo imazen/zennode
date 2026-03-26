@@ -8,7 +8,9 @@ use serde::{Deserialize, Serialize};
 use crate::format::{AlphaHandling, FormatHint, PixelFormatPreference};
 use crate::ordering::{CoalesceInfo, NodeRole};
 use crate::param::ParamValue;
-use crate::schema::{EnumVariant, NodeGroup, NodeSchema, ParamDesc, ParamKind, SliderMapping};
+use crate::schema::{
+    EnumVariant, NodeGroup, NodeSchema, ParamDesc, ParamKind, SliderMapping, TaggedVariant,
+};
 
 // --- ParamValue: untagged serialization ---
 
@@ -254,11 +256,31 @@ impl Serialize for ParamKind {
                     }
                 }
             }
+            Self::Object { params } => {
+                map.serialize_entry("type", "object")?;
+                map.serialize_entry("params", params)?;
+            }
+            Self::TaggedUnion { variants } => {
+                map.serialize_entry("type", "tagged_union")?;
+                map.serialize_entry("variants", variants)?;
+            }
             _ => {
                 map.serialize_entry("type", "unknown")?;
             }
         }
         map.end()
+    }
+}
+
+impl Serialize for TaggedVariant {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        use serde::ser::SerializeStruct;
+        let mut s = serializer.serialize_struct("TaggedVariant", 4)?;
+        s.serialize_field("tag", &self.tag)?;
+        s.serialize_field("label", &self.label)?;
+        s.serialize_field("description", &self.description)?;
+        s.serialize_field("params", &self.params)?;
+        s.end()
     }
 }
 
