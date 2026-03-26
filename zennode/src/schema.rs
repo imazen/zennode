@@ -318,6 +318,34 @@ pub struct EnumVariant {
     pub description: &'static str,
 }
 
+/// Trait for types that provide a JSON Schema fragment.
+///
+/// Auto-implemented by `#[derive(Node)]` on structs (with or without `#[node(id)]`)
+/// and on enums. For structs with `#[node(id)]`, both `JsonParam` and the full
+/// `NodeDef`/`NodeInstance` impls are generated. For structs without `#[node(id)]`,
+/// only `JsonParam` is generated.
+///
+/// For enums, `#[derive(Node)]` generates a `oneOf` JSON Schema supporting
+/// unit variants and struct variants, following serde's externally-tagged format.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// // Sub-struct (no node id) — only JsonParam is generated
+/// #[derive(Node, Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
+/// pub struct MyHints {
+///     pub down_filter: Option<String>,
+///     #[param(range(0.0..=100.0))]
+///     pub sharpen_percent: Option<f32>,
+/// }
+///
+/// assert!(!MyHints::JSON_SCHEMA.is_empty());
+/// ```
+pub trait JsonParam {
+    /// JSON Schema 2020-12 fragment as a static string.
+    const JSON_SCHEMA: &'static str;
+}
+
 /// How a parameter maps to a UI slider.
 #[non_exhaustive]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
