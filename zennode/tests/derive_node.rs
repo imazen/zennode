@@ -664,17 +664,15 @@ mod serde_tests {
     }
 
     /// A tagged union (like imageflow's ConstraintGravity).
-    #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq)]
+    #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, Default, PartialEq)]
     #[serde(rename_all = "snake_case")]
     pub enum Gravity {
+        #[default]
         Center,
-        Percentage { x: f32, y: f32 },
-    }
-
-    impl Default for Gravity {
-        fn default() -> Self {
-            Self::Center
-        }
+        Percentage {
+            x: f32,
+            y: f32,
+        },
     }
 
     /// Node with Json params for testing nested/complex types.
@@ -1172,10 +1170,11 @@ mod serde_tests {
     }
 
     /// Tagged enum: derives Node → NodeParams with TaggedVariant descriptors.
-    #[derive(Node, Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+    #[derive(Node, Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
     #[serde(rename_all = "snake_case")]
     pub enum SubGravity {
         /// Center of the image.
+        #[default]
         Center,
         /// Percentage-based position.
         Percentage {
@@ -1186,12 +1185,6 @@ mod serde_tests {
             #[param(range(0.0..=1.0), default = 0.5, step = 0.01)]
             y: f32,
         },
-    }
-
-    impl Default for SubGravity {
-        fn default() -> Self {
-            Self::Center
-        }
     }
 
     /// Full node using sub-struct and enum fields.
