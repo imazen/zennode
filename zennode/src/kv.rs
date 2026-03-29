@@ -280,6 +280,8 @@ fn from_hex(b: u8) -> Option<u8> {
 
 #[cfg(test)]
 mod tests {
+    use alloc::vec;
+
     use super::*;
 
     #[test]

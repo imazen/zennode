@@ -1,4 +1,5 @@
 //! Integration tests for `#[derive(NodeEnum)]`.
+#![cfg(feature = "derive")]
 
 extern crate alloc;
 
