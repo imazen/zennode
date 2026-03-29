@@ -23,6 +23,19 @@ pub struct NodeAttrs {
     pub tags: Vec<LitStr>,
     pub json_key: Option<LitStr>,
     pub deny_unknown_fields: bool,
+    /// Input port declarations: `#[node(inputs(canvas("bg"), input("fg")))]`.
+    pub inputs: Vec<InputPortAttr>,
+}
+
+/// Parsed input port from `#[node(inputs(...))]`.
+#[derive(Clone)]
+pub struct InputPortAttr {
+    /// Port kind: "input", "canvas", "from_io", "variadic".
+    pub kind: String,
+    /// Port label (the string argument).
+    pub label: LitStr,
+    /// Optional port name override. Default: derived from kind.
+    pub name: Option<LitStr>,
 }
 
 impl NodeAttrs {
@@ -91,6 +104,23 @@ impl NodeAttrs {
                     syn::parenthesized!(content in meta.input);
                     while !content.is_empty() {
                         result.tags.push(content.parse::<LitStr>()?);
+                        let _ = content.parse::<Token![,]>();
+                    }
+                } else if meta.path.is_ident("inputs") {
+                    let content;
+                    syn::parenthesized!(content in meta.input);
+                    while !content.is_empty() {
+                        let kind: Ident = content.parse()?;
+                        let kind_str = kind.to_string();
+                        // Parse the label in parens: input("foreground")
+                        let inner;
+                        syn::parenthesized!(inner in content);
+                        let label: LitStr = inner.parse()?;
+                        result.inputs.push(InputPortAttr {
+                            kind: kind_str,
+                            label,
+                            name: None,
+                        });
                         let _ = content.parse::<Token![,]>();
                     }
                 } else {

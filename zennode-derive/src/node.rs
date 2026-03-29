@@ -247,6 +247,35 @@ fn derive_node_inner(input: &DeriveInput) -> syn::Result<TokenStream2> {
 
     let num_params = param_desc_tokens.len();
 
+    // Generate input port tokens from #[node(inputs(...))]
+    let input_port_tokens: Vec<TokenStream2> = node_attrs
+        .inputs
+        .iter()
+        .map(|port| {
+            let label = &port.label;
+            let name = port.name.as_ref().map(|n| n.value()).unwrap_or_else(|| port.kind.clone());
+            let name_lit = proc_macro2::Literal::string(&name);
+            match port.kind.as_str() {
+                "canvas" => quote! {
+                    ::zennode::InputPort::canvas(#name_lit, #label)
+                },
+                "input" => quote! {
+                    ::zennode::InputPort::input(#name_lit, #label)
+                },
+                "from_io" => quote! {
+                    ::zennode::InputPort::from_io(#name_lit, #label)
+                },
+                "variadic" => quote! {
+                    ::zennode::InputPort::variadic(#name_lit, #label)
+                },
+                _ => quote! {
+                    ::zennode::InputPort::input(#name_lit, #label)
+                },
+            }
+        })
+        .collect();
+    let num_inputs = input_port_tokens.len();
+
     // Generated names
     let schema_name = format_ident!(
         "__ZENODE_{}_SCHEMA",
@@ -254,6 +283,10 @@ fn derive_node_inner(input: &DeriveInput) -> syn::Result<TokenStream2> {
     );
     let params_name = format_ident!(
         "__ZENODE_{}_PARAMS",
+        to_screaming_snake(&struct_name.to_string())
+    );
+    let inputs_name = format_ident!(
+        "__ZENODE_{}_INPUTS",
         to_screaming_snake(&struct_name.to_string())
     );
     let def_struct = format_ident!("{}NodeDef", struct_name);
@@ -303,6 +336,11 @@ fn derive_node_inner(input: &DeriveInput) -> syn::Result<TokenStream2> {
     Ok(quote! {
         #node_params_impl
 
+        // Static input port declarations
+        static #inputs_name: [::zennode::InputPort; #num_inputs] = [
+            #(#input_port_tokens),*
+        ];
+
         // Static schema
         static #schema_name: ::zennode::NodeSchema = ::zennode::NodeSchema {
             id: #id,
@@ -318,7 +356,7 @@ fn derive_node_inner(input: &DeriveInput) -> syn::Result<TokenStream2> {
             compat_version: #compat_version,
             json_key: #json_key_str,
             deny_unknown_fields: #deny_unknown,
-            inputs: &[],
+            inputs: &#inputs_name,
         };
 
         /// Node definition (factory) for [`#struct_name`].
