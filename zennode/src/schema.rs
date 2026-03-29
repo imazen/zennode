@@ -82,6 +82,7 @@ pub struct NodeSchema {
 /// of inputs.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[non_exhaustive]
 pub struct InputPort {
     /// Port name (e.g., "input", "canvas", "foreground", "images").
     pub name: &'static str,
@@ -99,9 +100,51 @@ pub struct InputPort {
     pub from_io_id: bool,
 }
 
+impl InputPort {
+    /// Create an input port with all fields specified.
+    pub const fn new(
+        name: &'static str,
+        label: &'static str,
+        edge_kind: EdgeKind,
+        required: bool,
+        variadic: bool,
+        from_io_id: bool,
+    ) -> Self {
+        Self {
+            name,
+            label,
+            edge_kind,
+            required,
+            variadic,
+            from_io_id,
+        }
+    }
+
+    /// A required input edge (the common case for composite foreground).
+    pub const fn input(name: &'static str, label: &'static str) -> Self {
+        Self::new(name, label, EdgeKind::Input, true, false, false)
+    }
+
+    /// A required canvas/background edge.
+    pub const fn canvas(name: &'static str, label: &'static str) -> Self {
+        Self::new(name, label, EdgeKind::Canvas, true, false, false)
+    }
+
+    /// An input referenced by io_id rather than a graph edge.
+    pub const fn from_io(name: &'static str, label: &'static str) -> Self {
+        Self::new(name, label, EdgeKind::Input, true, false, true)
+    }
+
+    /// A variadic input accepting N sources.
+    pub const fn variadic(name: &'static str, label: &'static str) -> Self {
+        Self::new(name, label, EdgeKind::Input, true, true, false)
+    }
+}
+
 /// Edge kind matching the wire format's edge types.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[non_exhaustive]
 pub enum EdgeKind {
     /// Normal data flow edge. Output of source → input of destination.
     Input,
