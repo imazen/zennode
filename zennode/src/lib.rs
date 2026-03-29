@@ -67,8 +67,8 @@ pub type Phase = NodeRole;
 pub use param::{ParamMap, ParamValue};
 pub use registry::{KvResult, NodeRegistry};
 pub use schema::{
-    EnumVariant, JsonParam, NodeGroup, NodeParams, NodeSchema, ParamDesc, ParamKind, SliderMapping,
-    TaggedVariant,
+    EdgeKind, EnumVariant, InputPort, JsonParam, NodeGroup, NodeParams, NodeSchema, ParamDesc,
+    ParamKind, SliderMapping, TaggedVariant,
 };
 pub use traits::{NodeDef, NodeInstance};
 pub use version::VersionSet;

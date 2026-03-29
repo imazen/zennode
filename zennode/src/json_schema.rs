@@ -43,6 +43,27 @@ pub fn node_to_json_schema(schema: &NodeSchema) -> Value {
 
     node_schema["x-zennode-format"] = serde_json::to_value(schema.format).unwrap_or(Value::Null);
 
+    if !schema.inputs.is_empty() {
+        let ports: std::vec::Vec<Value> = schema
+            .inputs
+            .iter()
+            .map(|p| {
+                json!({
+                    "name": p.name,
+                    "label": p.label,
+                    "edge_kind": match p.edge_kind {
+                        crate::schema::EdgeKind::Input => "input",
+                        crate::schema::EdgeKind::Canvas => "canvas",
+                    },
+                    "required": p.required,
+                    "variadic": p.variadic,
+                    "from_io_id": p.from_io_id,
+                })
+            })
+            .collect();
+        node_schema["x-zennode-inputs"] = json!(ports);
+    }
+
     if !required.is_empty() {
         node_schema["required"] = json!(required);
     }

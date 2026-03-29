@@ -57,6 +57,57 @@ pub struct NodeSchema {
     ///
     /// Set via `#[node(deny_unknown_fields)]`.
     pub deny_unknown_fields: bool,
+
+    /// Input ports this node expects from the pipeline graph.
+    ///
+    /// Empty slice (`&[]`) means the node has a single implicit input
+    /// from the preceding node in the pipeline (the common case for
+    /// filters, geometry, and resize operations).
+    ///
+    /// Nodes with multiple inputs (compositing, montage) declare their
+    /// ports explicitly. The codegen uses this to generate correct
+    /// method signatures (e.g., `DrawImage(otherNode, x, y)` vs
+    /// `Exposure(stops)`).
+    ///
+    /// Source nodes (Decode, CreateCanvas) typically have no inputs.
+    /// Terminal nodes (Encode) have one implicit input.
+    pub inputs: &'static [InputPort],
+}
+
+/// An input port on a node — describes one incoming edge in the pipeline graph.
+///
+/// Most nodes have a single implicit input (the previous node's output).
+/// Composite/blend nodes have two: the canvas/background and the
+/// foreground/overlay. Montage-style nodes may accept a variable number
+/// of inputs.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct InputPort {
+    /// Port name (e.g., "input", "canvas", "foreground", "images").
+    pub name: &'static str,
+    /// Human-readable label for the port.
+    pub label: &'static str,
+    /// Edge kind in the wire format.
+    pub edge_kind: EdgeKind,
+    /// Whether this port must be connected.
+    pub required: bool,
+    /// Whether this port accepts multiple sources (for N-way fan-in).
+    pub variadic: bool,
+    /// Whether the source is referenced by io_id in the node params
+    /// rather than by a graph edge (e.g., watermark images loaded from
+    /// a separate input buffer).
+    pub from_io_id: bool,
+}
+
+/// Edge kind matching the wire format's edge types.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum EdgeKind {
+    /// Normal data flow edge. Output of source → input of destination.
+    Input,
+    /// Canvas/background edge. Used by composite operations where the
+    /// destination node draws onto the source canvas.
+    Canvas,
 }
 
 impl NodeSchema {

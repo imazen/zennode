@@ -318,6 +318,7 @@ fn derive_node_inner(input: &DeriveInput) -> syn::Result<TokenStream2> {
             compat_version: #compat_version,
             json_key: #json_key_str,
             deny_unknown_fields: #deny_unknown,
+            inputs: &[],
         };
 
         /// Node definition (factory) for [`#struct_name`].
