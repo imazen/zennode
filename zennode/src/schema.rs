@@ -7,6 +7,7 @@ use crate::format::FormatHint;
 use crate::ordering::{CoalesceInfo, NodeRole};
 
 /// Complete static schema for one node type.
+#[derive(Debug)]
 pub struct NodeSchema {
     /// Permanent fully-qualified identifier: `"crate.operation"`.
     ///
