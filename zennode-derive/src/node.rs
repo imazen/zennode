@@ -253,7 +253,11 @@ fn derive_node_inner(input: &DeriveInput) -> syn::Result<TokenStream2> {
         .iter()
         .map(|port| {
             let label = &port.label;
-            let name = port.name.as_ref().map(|n| n.value()).unwrap_or_else(|| port.kind.clone());
+            let name = port
+                .name
+                .as_ref()
+                .map(|n| n.value())
+                .unwrap_or_else(|| port.kind.clone());
             let name_lit = proc_macro2::Literal::string(&name);
             match port.kind.as_str() {
                 "canvas" => quote! {

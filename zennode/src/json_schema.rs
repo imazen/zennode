@@ -256,7 +256,9 @@ pub fn querystring_key_registry(registry: &NodeRegistry) -> Value {
 /// Used for querystring key schemas where we only need the value type.
 fn param_value_schema(param: &ParamDesc) -> Value {
     match &param.kind {
-        ParamKind::Float { min, max, default, .. } => json!({
+        ParamKind::Float {
+            min, max, default, ..
+        } => json!({
             "type": "number", "minimum": min, "maximum": max, "default": default,
         }),
         ParamKind::Int { min, max, default } => json!({
