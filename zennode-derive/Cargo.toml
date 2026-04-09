@@ -9,6 +9,7 @@ readme = "../README.md"
 repository = "https://github.com/imazen/zennode"
 keywords = ["image", "pipeline", "node", "derive"]
 categories = ["multimedia::images"]
+exclude = ["CLAUDE.md", "CONTEXT-HANDOFF.md", "FEEDBACK.md", ".claude/", ".superwork/", ".zenbench/", "copter-report/", ".github/", "Cross.toml", "justfile", "Cargo.toml.original.txt", "fuzz/"]
 
 [lib]
 proc-macro = true
