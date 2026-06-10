@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Added
+- Versioned public-API surface snapshots at `docs/public-api/<crate>.txt` for
+  `zennode` and `zennode-derive`, regenerated on every `cargo test` run via
+  `zennode/tests/public_api_doc.rs` (`ZEN_API_DOC=check` verifies in CI,
+  `=off` skips); `justfile` recipes `api-doc` / `api-doc-check`
+
 ### Changed
 - Exclude `tests/`, `ENCODE-FULL.md`, `ENCODE-PATHS.md`, `SPEC.md` from published packages; add `.workongoing`/`.jj/` to `.gitignore`
 
