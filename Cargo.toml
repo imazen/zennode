@@ -1,3 +1,7 @@
 [workspace]
 members = ["zennode", "zennode-derive"]
 resolver = "3"
+# `apidoc/` is the CI-free public-API snapshot runner: excluded so plain
+# `cargo test` and CI never compile it or run rustdoc. Regenerate via
+# `just api-doc` (cargo test --manifest-path apidoc/Cargo.toml).
+exclude = ["apidoc"]

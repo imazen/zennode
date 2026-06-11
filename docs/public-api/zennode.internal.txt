@@ -1,0 +1,116 @@
+# zennode public API — doc(hidden) items and excluded-feature surface
+# excluded features: (none)
+# (regenerated on every `cargo test` by zenutils-apidoc; ZEN_API_DOC=check verifies, =off skips).
+# Encodings: crate-name prefix stripped; auto traits collapse to a
+# count + exceptions; trait impls collapse to one roster line per
+# type (method signatures live at the trait definition); blanket
+# impls omitted; re-export duplicates annotated `[also: path]`.
+# DO NOT EDIT BY HAND — commit regenerated changes with the code.
+
+## summary
+#
+#   pub modules                                 1
+#   pub types (struct/enum/trait/alias)         4
+#   pub consts/statics                          1
+#   inherent methods                           10
+#   struct fields                              42
+#   enum variants                              11
+#   re-exports                                  5
+#   trait roster entries (type × trait)         9
+#
+# per-module pub lines:
+#   (root)                            1
+#   __private                        63
+#   format                            3
+#   kv                                1
+#   ordering                          2
+#   schema                            4
+
+## items (74 lines)
+
+#[non_exhaustive] pub enum __private::ParamKind
+pub const __private::NodeParams::PARAM_KIND: schema::ParamKind
+pub fn format::AlphaHandling::assert_fields_are_eq(&self)
+pub fn format::FormatHint::assert_fields_are_eq(&self)
+pub fn format::PixelFormatPreference::assert_fields_are_eq(&self)
+pub fn kv::KvWarningKind::assert_fields_are_eq(&self)
+pub fn ordering::CoalesceInfo::assert_fields_are_eq(&self)
+pub fn ordering::NodeRole::assert_fields_are_eq(&self)
+pub fn schema::EdgeKind::assert_fields_are_eq(&self)
+pub fn schema::InputPort::assert_fields_are_eq(&self)
+pub fn schema::NodeGroup::assert_fields_are_eq(&self)
+pub fn schema::SliderMapping::assert_fields_are_eq(&self)
+pub mod __private
+pub struct __private::ParamDesc
+pub struct __private::TaggedVariant
+pub trait __private::NodeParams
+pub use __private::Box
+pub use __private::String
+pub use __private::ToString
+pub use __private::Vec
+pub use __private::serde_json
+pub __private::ParamDesc::description: &'static str
+pub __private::ParamDesc::json_aliases: &'static [&'static str]
+pub __private::ParamDesc::json_name: &'static str
+pub __private::ParamDesc::kind: schema::ParamKind
+pub __private::ParamDesc::kv_keys: &'static [&'static str]
+pub __private::ParamDesc::label: &'static str
+pub __private::ParamDesc::name: &'static str
+pub __private::ParamDesc::optional: bool
+pub __private::ParamDesc::section: &'static str
+pub __private::ParamDesc::since_version: u32
+pub __private::ParamDesc::slider: schema::SliderMapping
+pub __private::ParamDesc::unit: &'static str
+pub __private::ParamDesc::visible_when: &'static str
+pub __private::ParamKind::Bool
+pub __private::ParamKind::Bool::default: bool
+pub __private::ParamKind::Color
+pub __private::ParamKind::Color::default: [f32; 4]
+pub __private::ParamKind::Enum
+pub __private::ParamKind::Enum::default: &'static str
+pub __private::ParamKind::Enum::variants: &'static [schema::EnumVariant]
+pub __private::ParamKind::Float
+pub __private::ParamKind::Float::default: f32
+pub __private::ParamKind::Float::identity: f32
+pub __private::ParamKind::Float::max: f32
+pub __private::ParamKind::Float::min: f32
+pub __private::ParamKind::Float::step: f32
+pub __private::ParamKind::FloatArray
+pub __private::ParamKind::FloatArray::default: f32
+pub __private::ParamKind::FloatArray::labels: &'static [&'static str]
+pub __private::ParamKind::FloatArray::len: usize
+pub __private::ParamKind::FloatArray::max: f32
+pub __private::ParamKind::FloatArray::min: f32
+pub __private::ParamKind::Int
+pub __private::ParamKind::Int::default: i32
+pub __private::ParamKind::Int::max: i32
+pub __private::ParamKind::Int::min: i32
+pub __private::ParamKind::Json
+pub __private::ParamKind::Json::default_json: &'static str
+pub __private::ParamKind::Json::json_schema: &'static str
+pub __private::ParamKind::Object
+pub __private::ParamKind::Object::params: &'static [schema::ParamDesc]
+pub __private::ParamKind::Str
+pub __private::ParamKind::Str::default: &'static str
+pub __private::ParamKind::TaggedUnion
+pub __private::ParamKind::TaggedUnion::variants: &'static [schema::TaggedVariant]
+pub __private::ParamKind::U32
+pub __private::ParamKind::U32::default: u32
+pub __private::ParamKind::U32::max: u32
+pub __private::ParamKind::U32::min: u32
+pub __private::TaggedVariant::description: &'static str
+pub __private::TaggedVariant::label: &'static str
+pub __private::TaggedVariant::params: &'static [schema::ParamDesc]
+pub __private::TaggedVariant::tag: &'static str
+
+## trait impls (9 types)
+
+format::AlphaHandling: TrivialClone
+format::FormatHint: TrivialClone
+format::PixelFormatPreference: TrivialClone
+kv::KvWarningKind: TrivialClone
+ordering::NodeRole: TrivialClone
+schema::EdgeKind: TrivialClone
+schema::InputPort: TrivialClone
+schema::NodeGroup: TrivialClone
+schema::SliderMapping: TrivialClone

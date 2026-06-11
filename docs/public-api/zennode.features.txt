@@ -1,0 +1,77 @@
+# zennode public API — additions from non-default features
+# features: derive,json-schema,serde,std
+# (regenerated on every `cargo test` by zenutils-apidoc; ZEN_API_DOC=check verifies, =off skips).
+# Encodings: crate-name prefix stripped; auto traits collapse to a
+# count + exceptions; trait impls collapse to one roster line per
+# type (method signatures live at the trait definition); blanket
+# impls omitted; re-export duplicates annotated `[also: path]`.
+# DO NOT EDIT BY HAND — commit regenerated changes with the code.
+
+## summary
+#
+#   pub modules                                 2
+#   pub types (struct/enum/trait/alias)         1
+#   free functions                              6
+#   inherent methods                           10
+#   struct fields                               9
+#   trait roster entries (type × trait)        21
+#   auto-trait-complete types                   1
+#
+# per-module pub lines:
+#   (root)                            2
+#   json_schema                      16
+#   registry                         10
+
+## items (28 lines)
+
+pub mod json_schema
+pub struct json_schema::QsKey
+pub json_schema::QsKey::is_alias: bool
+pub json_schema::QsKey::key: &'static str
+pub json_schema::QsKey::node_id: &'static str
+pub json_schema::QsKey::node_label: &'static str
+pub json_schema::QsKey::param_description: &'static str
+pub json_schema::QsKey::param_label: &'static str
+pub json_schema::QsKey::param_name: &'static str
+pub json_schema::QsKey::primary_key: &'static str
+pub json_schema::QsKey::value_schema: serde_json::value::Value
+pub fn json_schema::node_to_json_schema(&schema::NodeSchema) -> serde_json::value::Value
+pub fn json_schema::querystring_key_registry(&registry::NodeRegistry) -> serde_json::value::Value
+pub fn json_schema::querystring_to_json_schema(&registry::NodeRegistry) -> serde_json::value::Value
+pub fn json_schema::registry_querystring_keys(&registry::NodeRegistry) -> alloc::vec::Vec<json_schema::QsKey>
+pub fn json_schema::registry_to_json_schema(&registry::NodeRegistry) -> serde_json::value::Value
+pub fn json_schema::registry_to_openapi_schemas(&registry::NodeRegistry) -> serde_json::value::Value
+pub fn registry::NodeRegistry::get_by_json_key(&self, &str) -> core::option::Option<&'static dyn traits::NodeDef>
+pub fn registry::NodeRegistry::node_from_json(&self, &serde_json::value::Value) -> core::result::Result<alloc::boxed::Box<dyn traits::NodeInstance>, error::NodeError>
+pub fn registry::NodeRegistry::node_to_json(&self, &dyn traits::NodeInstance) -> serde_json::value::Value
+pub fn registry::NodeRegistry::pipeline_from_json(&self, &serde_json::value::Value) -> core::result::Result<alloc::vec::Vec<alloc::boxed::Box<dyn traits::NodeInstance>>, error::NodeError>
+pub fn registry::NodeRegistry::pipeline_to_json(&self, &[alloc::boxed::Box<dyn traits::NodeInstance>]) -> serde_json::value::Value
+pub mod serde_impl
+pub fn registry::NodeRegistry::get_by_json_key(&self, &str) -> core::option::Option<&'static dyn traits::NodeDef>
+pub fn registry::NodeRegistry::node_from_json(&self, &serde_json::value::Value) -> core::result::Result<alloc::boxed::Box<dyn traits::NodeInstance>, error::NodeError>
+pub fn registry::NodeRegistry::node_to_json(&self, &dyn traits::NodeInstance) -> serde_json::value::Value
+pub fn registry::NodeRegistry::pipeline_from_json(&self, &serde_json::value::Value) -> core::result::Result<alloc::vec::Vec<alloc::boxed::Box<dyn traits::NodeInstance>>, error::NodeError>
+pub fn registry::NodeRegistry::pipeline_to_json(&self, &[alloc::boxed::Box<dyn traits::NodeInstance>]) -> serde_json::value::Value
+
+## trait impls (16 types)
+
+format::AlphaHandling: serde_core::ser::Serialize
+format::FormatHint: serde_core::ser::Serialize
+format::PixelFormatPreference: serde_core::ser::Serialize
+json_schema::QsKey: Clone, Debug, serde_core::ser::Serialize
+ordering::CoalesceInfo: serde_core::ser::Serialize
+ordering::NodeRole: serde_core::ser::Serialize
+param::ParamValue: serde_core::de::Deserialize<'de>, serde_core::ser::Serialize
+schema::EdgeKind: serde_core::de::Deserialize<'de>, serde_core::ser::Serialize
+schema::EnumVariant: serde_core::ser::Serialize
+schema::InputPort: serde_core::de::Deserialize<'static>, serde_core::ser::Serialize
+schema::NodeGroup: serde_core::ser::Serialize
+schema::NodeSchema: serde_core::ser::Serialize
+schema::ParamDesc: serde_core::ser::Serialize
+schema::ParamKind: serde_core::ser::Serialize
+schema::SliderMapping: serde_core::ser::Serialize
+schema::TaggedVariant: serde_core::ser::Serialize
+
+## auto traits
+
+1 types implement all of: Freeze, RefUnwindSafe, Send, Sync, Unpin, UnwindSafe

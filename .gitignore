@@ -1,4 +1,8 @@
 Cargo.lock
+# The apidoc runner's lockfile IS committed (negation must follow the
+# Cargo.lock ignore above — last match wins). apidoc/target/ is covered
+# by the unanchored target/ rule below.
+!apidoc/Cargo.lock
 .claude/
 
 # === Standard exclusions (do not depend on user ~/.gitignore) ===
