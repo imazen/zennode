@@ -20,6 +20,6 @@ exclude = [
 proc-macro = true
 
 [dependencies]
-syn = { version = "3.0.4", features = ["full", "extra-traits"] }
+syn = { version = "3.0.10", features = ["full", "extra-traits"] }
 quote = "1.0.47"
 proc-macro2 = "1.0.107"

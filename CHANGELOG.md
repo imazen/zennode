@@ -4,6 +4,10 @@
 
 ### Changed
 
+- Dependency requirements refreshed: `syn` 3.0.4 → 3.0.10 in `zennode-derive`;
+  `serde_json` 1.0.151 → 1.0.154 in `zennode`; lockfiles and `docs/public-api/`
+  internal snapshot counts refreshed (`assert_fields_are_eq` on fieldless enums).
+- Remove banned `macos-26-intel` runner from `.github/workflows/ci.yml`.
 - Dependency requirements refreshed to the current releases: `quote` 1.0.45 →
   1.0.47 and `proc-macro2` 1.0.106 → 1.0.107 in `zennode-derive`; `serde`
   1.0.228 → 1.0.229 and `serde_json` 1.0.149 → 1.0.151 in `zennode` (both the
