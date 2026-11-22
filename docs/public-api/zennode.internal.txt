@@ -12,7 +12,7 @@
 #   pub modules                                 1
 #   pub types (struct/enum/trait/alias)         4
 #   pub consts/statics                          1
-#   inherent methods                           10
+#   inherent methods                            3
 #   struct fields                              42
 #   enum variants                              11
 #   re-exports                                  5
@@ -21,25 +21,17 @@
 # per-module pub lines:
 #   (root)                            1
 #   __private                        63
-#   format                            3
-#   kv                                1
-#   ordering                          2
-#   schema                            4
+#   format                            1
+#   ordering                          1
+#   schema                            1
 
-## items (74 lines)
+## items (67 lines)
 
 #[non_exhaustive] pub enum __private::ParamKind
 pub const __private::NodeParams::PARAM_KIND: schema::ParamKind
-pub fn format::AlphaHandling::assert_fields_are_eq(&self)
 pub fn format::FormatHint::assert_fields_are_eq(&self)
-pub fn format::PixelFormatPreference::assert_fields_are_eq(&self)
-pub fn kv::KvWarningKind::assert_fields_are_eq(&self)
 pub fn ordering::CoalesceInfo::assert_fields_are_eq(&self)
-pub fn ordering::NodeRole::assert_fields_are_eq(&self)
-pub fn schema::EdgeKind::assert_fields_are_eq(&self)
 pub fn schema::InputPort::assert_fields_are_eq(&self)
-pub fn schema::NodeGroup::assert_fields_are_eq(&self)
-pub fn schema::SliderMapping::assert_fields_are_eq(&self)
 pub mod __private
 pub struct __private::ParamDesc
 pub struct __private::TaggedVariant

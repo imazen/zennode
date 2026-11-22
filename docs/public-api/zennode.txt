@@ -6,7 +6,7 @@
 # impls omitted; re-export duplicates annotated `[also: path]`.
 # DO NOT EDIT BY HAND — commit regenerated changes with the code.
 #
-# files: zennode.txt 523 lines (supported surface) | zennode.features.txt 45 added (features: derive,json-schema,serde,std) | zennode.internal.txt 83 lines (83 hidden + 0 excluded-feature)
+# files: zennode.txt 523 lines (supported surface) | zennode.features.txt 45 added (features: derive,json-schema,serde,std) | zennode.internal.txt 76 lines (76 hidden + 0 excluded-feature)
 
 ## summary
 #
